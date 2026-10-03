@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="1.0.1"
+
+# Optional local Whisper fallback discovery. Explicit environment overrides win.
+if [[ -z "${WHISPER_CLI:-}" ]] && command -v whisper-cli >/dev/null 2>&1; then
+  WHISPER_CLI="$(command -v whisper-cli)"
+  export WHISPER_CLI
+fi
+if [[ -z "${WHISPER_MODEL:-}" ]]; then
+  for candidate in \
+    "$HOME/.local/share/reasonpack/whisper/ggml-small.en.bin" \
+    "$HOME/.local/share/ghostmesh/whisper/ggml-small.en.bin"; do
+    if [[ -f "$candidate" ]]; then
+      export WHISPER_MODEL="$candidate"
+      break
+    fi
+  done
+fi
+need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing dependency: $1" >&2; return 1; }; }
+version_line(){ "$1" --version 2>&1 | head -n 1 || true; }
+sha(){ shasum -a 256 "$1" | awk '{print $1}'; }
+validate_url(){ python3 - "$1" <<'PY'
+import sys,urllib.parse
+u=urllib.parse.urlparse(sys.argv[1]); h=(u.hostname or '').lower(); allowed={'youtube.com','www.youtube.com','m.youtube.com','youtu.be'}
+if u.scheme not in {'http','https'} or h not in allowed: print(f'rejected source URL host: {h or "<none>"}',file=sys.stderr); raise SystemExit(2)
+print(sys.argv[1])
+PY
+}
+doctor(){
+  local ok=0
+  for x in yt-dlp ffmpeg ffprobe python3 shasum; do
+    if command -v "$x" >/dev/null 2>&1; then
+      printf '%-10s %s\n' "$x" "$(version_line "$x")"
+    else
+      echo "MISSING $x"
+      ok=1
+    fi
+  done
+  if [[ -n "${WHISPER_CLI:-}" ]]; then
+    if [[ -x "$WHISPER_CLI" ]]; then
+      echo "whisper configured"
+    else
+      echo "INVALID WHISPER_CLI"
+      ok=1
+    fi
+  else
+    echo "whisper optional/unconfigured"
+  fi
+  return "$ok"
+}
+inspect(){ local url="$1"; validate_url "$url" >/dev/null; need yt-dlp; yt-dlp --dump-single-json --skip-download --no-playlist "$url"; }
+transcribe_fallback(){ local audio="$1" out="$2" status="$3"; if [[ -z "${WHISPER_CLI:-}" || -z "${WHISPER_MODEL:-}" ]]; then python3 - "$status" <<'PY'
+import json,sys; open(sys.argv[1],'w').write(json.dumps({'status':'missing-captions-and-no-whisper-fallback'},indent=2)+'\n')
+PY
+return 20; fi; [[ -x "$WHISPER_CLI" && -f "$WHISPER_MODEL" ]] || return 21; local wav="${out%.txt}.wav" base="${out%.txt}"; ffmpeg -hide_banner -loglevel error -y -i "$audio" -ar 16000 -ac 1 -c:a pcm_s16le "$wav"; "$WHISPER_CLI" -m "$WHISPER_MODEL" -f "$wav" -otxt -of "$base" -np >/dev/null 2>"$base.whisper.stderr" || true; [[ -s "$out" ]] || return 23; python3 - "$status" "$WHISPER_CLI" "$WHISPER_MODEL" "$(sha "$WHISPER_MODEL")" <<'PY'
+import json,sys
+p,cli,model,h=sys.argv[1:]; open(p,'w').write(json.dumps({'status':'local-whisper-fallback','whisperCli':cli,'whisperModel':model,'whisperModelSha256':h},indent=2)+'\n')
+PY
+}
+build(){ local url="$1" out="$2"; validate_url "$url" >/dev/null; for x in yt-dlp ffmpeg ffprobe python3 shasum; do need "$x"; done; mkdir -p "$out"; out="$(cd "$out" && pwd)"; yt-dlp --dump-single-json --skip-download --no-playlist "$url" > "$out/source.json"; yt-dlp --no-playlist -f 'bv*+ba/b' -o "$out/source.%(ext)s" "$url"; local src; src="$(find "$out" -maxdepth 1 -type f -name 'source.*' ! -name 'source.json' | head -n1)"; [[ -n "$src" && -s "$src" ]] || return 30; ffmpeg -hide_banner -loglevel error -y -i "$src" -map 0:v:0 -map 0:a:0? -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "$out/video.mp4"; ffmpeg -hide_banner -loglevel error -y -i "$src" -vn -c:a aac -b:a 128k "$out/audio.m4a"; ffprobe -v error -show_format -show_streams -of json "$out/video.mp4" > "$out/ffprobe.json"; local transcript="$out/transcript.txt" status="$out/transcript-status.json"; yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs --sub-langs 'en.*' --sub-format vtt -o "$out/captions.%(ext)s" "$url" >/dev/null 2>&1 || true; local cap; cap="$(find "$out" -maxdepth 1 -type f -name 'captions*.vtt' | head -n1 || true)"; if [[ -n "$cap" && -s "$cap" ]]; then mv "$cap" "$out/captions.vtt"; cap="$out/captions.vtt"; python3 - "$cap" "$transcript" "$status" <<'PY'
+import re,sys,json
+src,out,status=sys.argv[1:]; lines=[]
+for line in open(src,encoding='utf-8',errors='replace'):
+ s=line.strip()
+ if not s or s.startswith(('WEBVTT','NOTE','Kind:','Language:')) or '-->' in s or re.fullmatch(r'\d+',s): continue
+ s=re.sub(r'<[^>]+>','',s)
+ if not lines or lines[-1]!=s: lines.append(s)
+open(out,'w').write('\n'.join(lines)+'\n'); open(status,'w').write(json.dumps({'status':'source-captions','sourceFile':src},indent=2)+'\n')
+PY
+else transcribe_fallback "$out/audio.m4a" "$transcript" "$status" || true; fi; [[ -s "$transcript" ]] || { echo "transcript unavailable; see $status" >&2; return 31; }; rm -f "$src" "$out/transcript.wav" "$out/transcript.whisper.stderr"; find "$out" -maxdepth 1 -type f -name 'captions*.vtt' ! -name 'captions.vtt' -delete; python3 - "$out" "$url" <<'PY'
+import json,sys,hashlib,subprocess,os
+out,url=sys.argv[1:]
+def ver(cmd):
+ try:return subprocess.run([cmd,'--version'],capture_output=True,text=True,timeout=10).stdout.splitlines()[0]
+ except Exception:return None
+m={'schema':'ghostmesh-reasoning-pack-v1','sourceUrl':url,'tools':{x:ver(x) for x in ['yt-dlp','ffmpeg','ffprobe','python3']},'members':[]}
+for name in ['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json','captions.vtt']:
+ p=os.path.join(out,name)
+ if os.path.isfile(p): m['members'].append({'path':name,'sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'bytes':os.path.getsize(p)})
+open(os.path.join(out,'manifest.json'),'w').write(json.dumps(m,indent=2)+'\n')
+PY
+(cd "$out" && python3 - <<'PY' > .reasonpack-members
+import json
+m=json.load(open('manifest.json'))
+for e in m['members']: print(e['path'])
+print('manifest.json')
+PY
+: > SHA256SUMS.txt
+while IFS= read -r member; do shasum -a 256 "$member" >> SHA256SUMS.txt; done < .reasonpack-members
+rm -f .reasonpack-members); verify "$out"; }
+verify(){ local out="$1"; need shasum; need python3; [[ -d "$out" && -s "$out/manifest.json" && -s "$out/SHA256SUMS.txt" ]] || return 40; (cd "$out" && shasum -a 256 -c SHA256SUMS.txt); python3 - "$out/manifest.json" "$out" <<'PY'
+import json,sys,os,hashlib
+m=json.load(open(sys.argv[1])); root=sys.argv[2]; assert m.get('schema')=='ghostmesh-reasoning-pack-v1'
+entries=m.get('members',[]); paths={e['path'] for e in entries}; required={'video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json'}; assert required <= paths
+for e in entries:
+ p=os.path.join(root,e['path']); assert os.path.isfile(p) and os.path.getsize(p)>0; assert hashlib.sha256(open(p,'rb').read()).hexdigest()==e['sha256']
+allowed=paths|{'manifest.json','SHA256SUMS.txt'}; actual={n for n in os.listdir(root) if os.path.isfile(os.path.join(root,n))}; assert actual==allowed, f'untracked pack members: {sorted(actual-allowed)}; missing: {sorted(allowed-actual)}'
+print('PASS reasoning pack verification')
+PY
+}
+self_test(){ validate_url 'https://www.youtube.com/watch?v=abc' >/dev/null; if validate_url 'https://example.com/x' >/dev/null 2>&1; then return 90; fi; local td; td="$(mktemp -d)"; trap 'rm -rf "$td"' RETURN; for f in video.mp4 audio.m4a transcript.txt transcript-status.json source.json ffprobe.json; do printf 'fixture-%s\n' "$f" > "$td/$f"; done; python3 - "$td" <<'PY'
+import hashlib,json,os,sys
+root=sys.argv[1]; members=[]
+for name in ['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json']:
+ p=os.path.join(root,name); members.append({'path':name,'sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'bytes':os.path.getsize(p)})
+open(os.path.join(root,'manifest.json'),'w').write(json.dumps({'schema':'ghostmesh-reasoning-pack-v1','sourceUrl':'https://www.youtube.com/watch?v=fixture','tools':{},'members':members},indent=2)+'\n')
+PY
+(cd "$td" && shasum -a 256 video.mp4 audio.m4a transcript.txt transcript-status.json source.json ffprobe.json manifest.json > SHA256SUMS.txt); verify "$td" >/dev/null; printf 'untracked\n' > "$td/extra.tmp"; if verify "$td" >/dev/null 2>&1; then return 91; fi; rm -f "$td/extra.tmp"; echo "PASS reasonpack self-test"; }
+cmd="${1:-}"; shift || true
+case "$cmd" in version) echo "$VERSION";; doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; *) echo 'usage: reasonpack {version|doctor|inspect|build|verify|self-test}' >&2; exit 64;; esac

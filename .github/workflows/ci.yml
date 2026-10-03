@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: bash -n bin/reasonpack
+      - name: Offline self-test
+        run: bin/reasonpack self-test
+      - name: Contract checks
+        run: python3 tests/test_contract.py
