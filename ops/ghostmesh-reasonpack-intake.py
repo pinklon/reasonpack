@@ -114,9 +114,21 @@ def slack_coords(row: sqlite3.Row) -> tuple[str | None, str | None]:
         return None, None
 
 
-def create_jobs(state: sqlite3.Connection, rows: list[sqlite3.Row]) -> int:
+def create_jobs(state: sqlite3.Connection, rows: list[sqlite3.Row], allowed_actors: set[str]) -> int:
     created = 0
     for row in rows:
+        if row["actor_id"] not in allowed_actors:
+            key = f'{row["event_id"]}:ignored-actor'
+            now = utc_now()
+            channel, thread_ts = slack_coords(row)
+            state.execute(
+                """INSERT OR IGNORE INTO jobs
+                   (job_key,event_id,source_seq,source_url,slack_channel,slack_thread_ts,
+                    status,created_at,updated_at)
+                   VALUES (?,?,?,?,?,?,?, ?,?)""",
+                (key, row["event_id"], row["seq"], "", channel, thread_ts, "ignored_actor", now, now),
+            )
+            continue
         urls = youtube_urls(row["text"])
         channel, thread_ts = slack_coords(row)
         if not urls:
@@ -318,7 +330,8 @@ def drain_deliveries(state: sqlite3.Connection) -> int:
 def run_once(args: argparse.Namespace) -> dict:
     state = open_state(Path(args.state_db))
     events = read_new_events(Path(args.collab_db), state)
-    created = create_jobs(state, events)
+    allowed_actors = {x.strip() for x in args.allowed_actors.split(",") if x.strip()}
+    created = create_jobs(state, events, allowed_actors)
     pending = state.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY source_seq,created_at").fetchall()
     processed = 0
     for job in pending:
@@ -343,6 +356,7 @@ def main() -> int:
     p.add_argument("--receipt-root", default=os.environ.get("REASONPACK_RECEIPT_ROOT", "/srv/ghostmesh/workspaces/state/reasonpack/receipts"))
     p.add_argument("--reasonpack", default=os.environ.get("REASONPACK_BIN", DEFAULT_REASONPACK))
     p.add_argument("--poll-seconds", type=int, default=int(os.environ.get("REASONPACK_POLL_SECONDS", "5")))
+    p.add_argument("--allowed-actors", default=os.environ.get("REASONPACK_ALLOWED_ACTORS", "person:tony"))
     p.add_argument("--daemon", action="store_true")
     args = p.parse_args()
     if not args.daemon:
