@@ -31,7 +31,7 @@ ReasonPack intake daemon
 
 Slack carries intent and source coordinates. It does not grant Production or execution authority outside this bounded evidence-building action.
 
-The worker consumes only canonical events in `collab:inbox`, validates YouTube URLs, deduplicates by canonical event plus URL, and records processing state independently.
+The worker consumes only canonical events in `collab:inbox`, validates YouTube URLs, deduplicates by canonical event plus URL, and records processing state independently. Initial execution is restricted to `person:tony`; other canonical actors are retained as `ignored_actor` without executing work. The allowlist is configurable with `REASONPACK_ALLOWED_ACTORS`.
 
 ## Runtime
 
