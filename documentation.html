@@ -1,0 +1,2696 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ReasonPack v1.1 Documentation</title><style>
+:root{--ink:#122033;--muted:#66788a;--line:#d9e2e9;--blue:#0c83b8;--navy:#07111f;--paper:#fbfcfd;--card:#fff}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);line-height:1.65}.top{position:sticky;top:0;z-index:20;background:#07111ff2;color:white;padding:14px 22px;border-bottom:1px solid #27445d;display:flex;gap:18px;align-items:center}.brand{font-weight:800}.top span{color:#9cb1c3;font-size:12px}.search{margin-left:auto;width:min(360px,45vw);padding:10px 12px;border:1px solid #35526b;border-radius:10px;background:#0b1b2c;color:white}.layout{display:grid;grid-template-columns:280px minmax(0,1fr);max-width:1500px;margin:auto}.side{position:sticky;top:63px;height:calc(100vh - 63px);overflow:auto;border-right:1px solid var(--line);padding:24px 18px;background:#f4f8fa}.side a{display:block;padding:8px 10px;text-decoration:none;color:#40566a;border-radius:8px;font-size:13px}.side a:hover{background:#e4f3fa;color:#006d9c}.content{padding:40px clamp(22px,5vw,74px) 100px;min-width:0}.content section{max-width:980px;margin:0 auto 100px;scroll-margin-top:90px}.doc-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);font-weight:800;margin-bottom:12px}.content h1{font-size:clamp(38px,5vw,64px);line-height:1;letter-spacing:-.04em;margin:0 0 28px}.content h2{font-size:30px;letter-spacing:-.025em;margin-top:1.8em}.content h3{font-size:21px;margin-top:1.7em}.content p,.content li{font-size:16px}.content table{width:100%;border-collapse:collapse;margin:24px 0;display:block;overflow:auto}.content th,.content td{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top;min-width:120px}.content th{background:#f1f6f8}.content code{background:#eef3f5;padding:.12em .32em;border-radius:4px;font-family:"SFMono-Regular",Consolas,monospace;font-size:.9em}.content pre{background:var(--navy);color:#d7efff;padding:18px;border-radius:12px;overflow:auto}.content pre code{background:none;padding:0}.content blockquote{margin:28px 0;border-left:4px solid var(--blue);padding:8px 20px;color:#445b6d;background:#f4f9fb}.back{color:#79dcff;text-decoration:none;font-size:12px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{position:relative;top:0;height:auto;border-right:0;border-bottom:1px solid var(--line);display:flex;overflow:auto;gap:2px;padding:10px}.side a{white-space:nowrap}.content{padding-top:28px}.top span{display:none}}
+</style></head><body><header class="top"><div class="brand">ReasonPack v1.1</div><span>Professional Reference Documentation</span><a class="back" href="index.html">← Product tour</a><input id="q" class="search" type="search" placeholder="Filter documentation…" aria-label="Filter documentation"></header><div class="layout"><nav class="side"><a href="#product-feature-set" data-title="product feature set">Product Feature Set</a><a href="#feature-posture-quick-ref" data-title="feature posture quick ref">Feature Posture Quick Ref</a><a href="#prd" data-title="prd">PRD</a><a href="#vision-strategy" data-title="vision &amp; strategy">Vision &amp; Strategy</a><a href="#architecture" data-title="architecture">Architecture</a><a href="#package-contract" data-title="package contract">Package Contract</a><a href="#requirements-traceability" data-title="requirements traceability">Requirements Traceability</a><a href="#decisions-tradeoffs" data-title="decisions &amp; tradeoffs">Decisions &amp; Tradeoffs</a><a href="#what-good-looks-like" data-title="what good looks like">What Good Looks Like</a><a href="#success-metrics" data-title="success metrics">Success Metrics</a><a href="#dependencies" data-title="dependencies">Dependencies</a><a href="#support-matrix" data-title="support matrix">Support Matrix</a><a href="#installation" data-title="installation">Installation</a><a href="#user-guide" data-title="user guide">User Guide</a><a href="#operating-model" data-title="operating model">Operating Model</a><a href="#troubleshooting" data-title="troubleshooting">Troubleshooting</a><a href="#security-rights" data-title="security &amp; rights">Security &amp; Rights</a><a href="#developer-guide" data-title="developer guide">Developer Guide</a><a href="#execution-packet-bridge" data-title="execution packet bridge">Execution Packet Bridge</a><a href="#roadmap" data-title="roadmap">Roadmap</a><a href="#handoff-philosophy" data-title="handoff philosophy">Handoff Philosophy</a><a href="#documentation-map" data-title="documentation map">Documentation Map</a></nav><main class="content"><section id="product-feature-set" data-title="product feature set"><div class="doc-kicker">PRODUCT_FEATURE_SET.md</div><h1>Product Feature Set</h1>
+<p>This document is the authoritative feature posture for the reference kit. It separates what the current runtime actually performs from roadmap ideas. Marketing illustrations, demos and future architecture notes do not override this file.</p>
+<h2>Product in one sentence</h2>
+<p>ReasonPack converts one allowed YouTube URL into a local, provenance-preserving, hash-verifiable package of media, transcript and source evidence for later human or AI-assisted reasoning.</p>
+<h2>CURRENT — implemented in the reference runtime</h2>
+<h3>1. Source admission</h3>
+<p><strong>Capability:</strong> Accept one explicit URL and reject unsupported hosts before acquisition.</p>
+<p>Current allowed hosts:</p>
+<ul>
+<li><code>youtube.com</code></li>
+<li><code>www.youtube.com</code></li>
+<li><code>m.youtube.com</code></li>
+<li><code>youtu.be</code></li>
+</ul>
+<p>The runtime does not expand arbitrary hosts and uses <code>--no-playlist</code> so one invocation means one source, not an accidental channel-sized acquisition.</p>
+<p><strong>Why it matters:</strong> source scope is part of the evidence boundary. A general-purpose downloader has a much larger authority and attack surface than this utility needs.</p>
+<h3>2. Source inspection</h3>
+<p>Command:</p>
+<pre><code class="language-bash">reasonpack inspect &quot;URL&quot;
+</code></pre>
+<p>Uses <code>yt-dlp --dump-single-json --skip-download --no-playlist</code> to expose source metadata before downloading media.</p>
+<p>Typical use: confirm title, video ID, duration and available source metadata before committing time or bandwidth to a build.</p>
+<h3>3. Media acquisition</h3>
+<p>ReasonPack uses <code>yt-dlp</code> to obtain one best-available video/audio source suitable for local normalization.</p>
+<p>The downloaded source file is <strong>temporary working material</strong>. After a successful build, ReasonPack removes the original downloaded carrier and retains the normalized evidence members instead.</p>
+<h3>4. Video normalization</h3>
+<p>Creates <code>video.mp4</code> with:</p>
+<ul>
+<li>H.264 video (<code>libx264</code>);</li>
+<li><code>yuv420p</code> pixel format for broad playback compatibility;</li>
+<li>AAC audio when source audio exists;</li>
+<li><code>+faststart</code> MP4 layout;</li>
+<li>CRF 23 / medium preset in the current reference runtime.</li>
+</ul>
+<p><strong>Why normalize:</strong> downstream reasoning tools and people should not have to understand every container/codec combination YouTube happens to serve.</p>
+<h3>5. Audio extraction</h3>
+<p>Creates <code>audio.m4a</code> with AAC audio at 128 kbps.</p>
+<p>The audio member gives transcription and audio-only workflows a stable input without repeatedly extracting audio from video.</p>
+<h3>6. Technical media inspection</h3>
+<p>Creates <code>ffprobe.json</code> using <code>ffprobe</code> against the normalized MP4. This captures stream/container metadata independently from YouTube’s source metadata.</p>
+<p><code>source.json</code> describes the source. <code>ffprobe.json</code> describes the normalized output. They are different evidence roles.</p>
+<h3>7. Captions-first transcript strategy</h3>
+<p>ReasonPack attempts to retrieve English source subtitles or automatic captions in VTT format.</p>
+<p>When captions exist:</p>
+<ul>
+<li>the selected VTT is retained as <code>captions.vtt</code>;</li>
+<li>caption markup/timing control lines are simplified into <code>transcript.txt</code>;</li>
+<li><code>transcript-status.json</code> records <code>source-captions</code> provenance.</li>
+</ul>
+<p>ReasonPack does not claim that source captions are human-verified or error-free.</p>
+<h3>8. Optional local Whisper fallback</h3>
+<p>When captions do not exist, ReasonPack may use local <code>whisper-cli</code> <strong>only</strong> when both are explicitly configured:</p>
+<pre><code class="language-bash">export WHISPER_CLI=/path/to/whisper-cli
+export WHISPER_MODEL=/path/to/model.bin
+</code></pre>
+<p>The fallback:</p>
+<ol>
+<li>converts audio to 16 kHz, mono, 16-bit PCM WAV;</li>
+<li>invokes the configured local Whisper executable and model;</li>
+<li>requires a non-empty transcript output;</li>
+<li>records the Whisper executable path, model path and model SHA-256 in <code>transcript-status.json</code>.</li>
+</ol>
+<p>If captions are absent and Whisper is not configured, the build fails rather than pretending the pack is complete.</p>
+<h3>9. Transcript status as evidence</h3>
+<p><code>transcript-status.json</code> distinguishes at least:</p>
+<ul>
+<li>transcript derived from source captions;</li>
+<li>transcript derived from configured local Whisper;</li>
+<li>captions missing and no Whisper fallback configured.</li>
+</ul>
+<p>This status is a provenance record, not a transcript-quality score.</p>
+<h3>10. Member manifest</h3>
+<p><code>manifest.json</code> records:</p>
+<ul>
+<li>schema: <code>ghostmesh-reasoning-pack-v1</code>;</li>
+<li>source URL;</li>
+<li>tool version lines for <code>yt-dlp</code>, <code>ffmpeg</code>, <code>ffprobe</code> and <code>python3</code>;</li>
+<li>member path;</li>
+<li>member byte count;</li>
+<li>member SHA-256.</li>
+</ul>
+<p>This allows a recipient to inspect exactly what bytes were sealed into that pack.</p>
+<h3>11. Independent checksum inventory</h3>
+<p><code>SHA256SUMS.txt</code> records SHA-256 values for all tracked members plus <code>manifest.json</code>.</p>
+<p>The checksum inventory is intentionally simple and readable by ordinary operating-system tools as well as the ReasonPack verifier.</p>
+<h3>12. Closed-pack verification</h3>
+<p>Command:</p>
+<pre><code class="language-bash">reasonpack verify &quot;/path/to/pack&quot;
+</code></pre>
+<p>Verification rejects:</p>
+<ul>
+<li>missing required members;</li>
+<li>empty required members;</li>
+<li>byte-count mismatch;</li>
+<li>SHA-256 mismatch;</li>
+<li>missing manifest/checksum records;</li>
+<li>unexplained regular files in the canonical pack directory.</li>
+</ul>
+<p><strong>Important:</strong> verification proves internal byte integrity against the recorded manifest. It does not prove source truth, copyright status, or transcript semantic accuracy.</p>
+<h3>13. Dependency diagnostics</h3>
+<pre><code class="language-bash">reasonpack doctor
+</code></pre>
+<p>Reports availability/version information for the required local runtime and reports Whisper as optional, configured, unconfigured, or invalidly configured.</p>
+<h3>14. Built-in self-test</h3>
+<pre><code class="language-bash">reasonpack self-test
+</code></pre>
+<p>The self-test exercises URL admission and verifies a synthetic pack. It also proves that an unexplained file causes verification to fail.</p>
+<p>It is a runtime sanity check, not an end-to-end YouTube network test.</p>
+<h3>15. One-command convenience flow</h3>
+<pre><code class="language-bash">yt &quot;URL&quot;
+</code></pre>
+<p>The reference distribution interprets a URL as a quick build request, fetches metadata for a human-readable folder name, and writes to:</p>
+<pre><code class="language-text">${REASONPACK_ROOT:-~/Desktop/Reasoning Packs}/&lt;title&gt; [video-id]/
+</code></pre>
+<p>An explicit output directory remains available through <code>reasonpack build URL OUT_DIR</code>.</p>
+<h3>16. Local-first / provider-neutral output</h3>
+<p>A ReasonPack is an ordinary directory of files. Building or verifying one does not require:</p>
+<ul>
+<li>SharePlane;</li>
+<li>Codex;</li>
+<li>Claude;</li>
+<li>Microsoft Copilot;</li>
+<li>GitHub;</li>
+<li>Google Drive;</li>
+<li>a cloud API key.</li>
+</ul>
+<p>The acquisition step obviously requires network access to the permitted source. Transformation and verification are local.</p>
+<h3>17. No automatic upload, publication or telemetry</h3>
+<p>The current reference runtime:</p>
+<ul>
+<li>does not upload packs;</li>
+<li>does not publish packs;</li>
+<li>does not send usage telemetry;</li>
+<li>does not import browser cookies or private browsing state;</li>
+<li>does not automatically invoke an AI model.</li>
+</ul>
+<h2>NEXT — useful extensions, not current behavior</h2>
+<p>These capabilities are candidates for a later derived-context layer or product increment:</p>
+<ul>
+<li>source-grounded summary generation;</li>
+<li>topic / concept extraction;</li>
+<li>chapter and timestamp citation index;</li>
+<li>selected keyframe extraction;</li>
+<li>batch source intake with explicit per-source identity;</li>
+<li>richer diagnostics and machine-readable doctor receipt;</li>
+<li>signed release manifests;</li>
+<li>updater / uninstaller lifecycle;</li>
+<li>enterprise proxy and certificate guidance;</li>
+<li>native Windows runtime rather than WSL;</li>
+<li>optional Execution Packet creation from a verified ReasonPack;</li>
+<li>normalized downstream execution receipts.</li>
+</ul>
+<p>A design constraint for these features: <strong>derived analysis should not silently mutate the canonical source-evidence pack</strong>. It should be a separate artifact or explicitly versioned layer with provenance back to the pack it used.</p>
+<h2>NOT YET — intentionally not implied by this kit</h2>
+<p>The current product is not:</p>
+<ul>
+<li>a knowledge graph;</li>
+<li>a team knowledge base;</li>
+<li>a remote storage service;</li>
+<li>a browser extension;</li>
+<li>a background monitoring service;</li>
+<li>a YouTube account/private-content importer;</li>
+<li>an enterprise search connector;</li>
+<li>an automatic AI-agent execution platform;</li>
+<li>an approval system;</li>
+<li>an identity/access-management system;</li>
+<li>a rights-management or copyright-clearance system.</li>
+</ul>
+<p>Those may be adjacent systems. They are not current ReasonPack capabilities.</p>
+</section><section id="feature-posture-quick-ref" data-title="feature posture quick ref"><div class="doc-kicker">FEATURE_CURRENT_NEXT_NOT_YET.md</div><h1>Feature Posture — Quick Reference</h1>
+<p>Use this page when someone needs a one-screen answer.</p>
+<h2>CURRENT</h2>
+<p><strong>Source:</strong> one allowlisted YouTube URL; metadata/media/caption acquisition; no playlists.</p>
+<p><strong>Transform:</strong> H.264/AAC MP4, AAC audio, ffprobe metadata.</p>
+<p><strong>Transcript:</strong> source captions first; optional explicitly configured local Whisper fallback; transcript status always matters.</p>
+<p><strong>Evidence:</strong> member byte counts, SHA-256 hashes, manifest, independent checksum list, closed-directory verifier.</p>
+<p><strong>Operations:</strong> doctor, inspect, build, verify, self-test, quick <code>yt URL</code> flow.</p>
+<p><strong>Platform:</strong> macOS, Linux, Windows via WSL reference install paths.</p>
+<p><strong>External side effects:</strong> source acquisition only. No auto-upload, publication, telemetry or downstream AI execution.</p>
+<h2>NEXT</h2>
+<p>Derived summaries/topics, timestamp/chapter index, keyframes, richer diagnostics, signed releases, batch intake, enterprise proxy guidance, native Windows, storage adapters, optional Execution Packet adapter.</p>
+<h2>NOT YET</h2>
+<p>Knowledge graph, team sync service, remote registry as core dependency, background monitor, browser/private-account credential import, automatic AI-agent execution.</p>
+<p>For full semantics and caveats, read <code>PRODUCT_FEATURE_SET.md</code>.</p>
+</section><section id="prd" data-title="prd"><div class="doc-kicker">PRD.md</div><h1>Product Requirements Document — ReasonPack Reference Runtime</h1>
+<h2>1. Product summary</h2>
+<p>ReasonPack is a local developer utility for turning one authorized YouTube source into a portable, provenance-preserving, integrity-verifiable context package suitable for later human review or AI-assisted reasoning.</p>
+<p>The product is not trying to be the best media downloader. It is trying to make useful external information <strong>easier to carry forward than to rediscover and re-explain</strong>.</p>
+<h2>2. Problem statement</h2>
+<p>Video contains valuable technical, educational and strategic information, but ordinary video consumption has weak continuity for serious AI-assisted work:</p>
+<ul>
+<li>the useful content is trapped behind a player and timeline;</li>
+<li>teams repeatedly revisit or retranscribe the same source;</li>
+<li>source metadata and transcript provenance are easily separated from derived analysis;</li>
+<li>different AI tools have different upload/runtime constraints;</li>
+<li>local transformations are often performed ad hoc with no durable byte identity;</li>
+<li>a later recipient cannot tell which transcript/media version the original analysis used.</li>
+</ul>
+<p>The result is repeated context reconstruction and weak evidence lineage.</p>
+<h2>3. Target users</h2>
+<h3>Primary</h3>
+<ul>
+<li>software engineers and architects;</li>
+<li>development managers;</li>
+<li>researchers and technical analysts;</li>
+<li>trainers / enablement leads;</li>
+<li>AI-native knowledge workers who move work between multiple reasoning tools.</li>
+</ul>
+<h3>Secondary</h3>
+<ul>
+<li>teams creating internal learning artifacts;</li>
+<li>reviewers who need to verify source material used by someone else;</li>
+<li>automation owners that need a stable input artifact before downstream execution.</li>
+</ul>
+<h2>4. Jobs to be done</h2>
+<p>A user should be able to:</p>
+<ol>
+<li>inspect one YouTube source before downloading it;</li>
+<li>acquire the source without accidentally expanding into a playlist;</li>
+<li>normalize media into broadly usable local formats;</li>
+<li>obtain a transcript through an explicit evidence path;</li>
+<li>understand whether the transcript came from source captions or local speech inference;</li>
+<li>preserve source and technical metadata;</li>
+<li>seal member sizes and SHA-256 identities;</li>
+<li>give the package to another person or tool;</li>
+<li>later verify that the package was not silently changed;</li>
+<li>know when the tool could not produce a valid pack.</li>
+</ol>
+<h2>5. Product goals</h2>
+<h3>G1 — portable context</h3>
+<p>Produce ordinary files that can be inspected without a ReasonPack service or proprietary database.</p>
+<h3>G2 — provenance before synthesis</h3>
+<p>Preserve source identity and transcript path before adding future derived summaries or interpretations.</p>
+<h3>G3 — explicit failure</h3>
+<p>Prefer a failed/incomplete build over a falsely complete evidence package.</p>
+<h3>G4 — recipient independence</h3>
+<p>A competent technical recipient should be able to install, operate and verify the product from the package itself.</p>
+<h3>G5 — composability</h3>
+<p>Keep downstream AI execution, storage and publication optional so the core can plug into different environments.</p>
+<h2>6. Non-goals for the current version</h2>
+<p>ReasonPack v1 is not required to:</p>
+<ul>
+<li>support arbitrary video sites;</li>
+<li>authenticate to private YouTube accounts;</li>
+<li>download playlists;</li>
+<li>automatically summarize or interpret content;</li>
+<li>guarantee transcript factual accuracy;</li>
+<li>determine copyright/redistribution rights;</li>
+<li>provide cloud storage or team synchronization;</li>
+<li>route work to an AI model;</li>
+<li>provide native Windows execution outside WSL;</li>
+<li>guarantee bit-identical reacquisition from a changing remote source;</li>
+<li>provide production SLA/support commitments.</li>
+</ul>
+<h2>7. Functional requirements</h2>
+<h3>FR-001 — source URL admission</h3>
+<p>The runtime shall reject URLs outside the configured YouTube host allowlist before acquisition.</p>
+<h3>FR-002 — single-source scope</h3>
+<p>Acquisition and caption operations shall use no-playlist behavior by default.</p>
+<h3>FR-003 — inspect command</h3>
+<p>The runtime shall support metadata inspection without media download.</p>
+<h3>FR-004 — media acquisition</h3>
+<p>The runtime shall download one source media representation and verify that a non-empty local source file exists before normalization continues.</p>
+<h3>FR-005 — normalized video</h3>
+<p>A successful build shall contain non-empty <code>video.mp4</code> encoded as H.264 with broadly compatible pixel format and MP4 fast-start layout.</p>
+<h3>FR-006 — normalized audio</h3>
+<p>A successful build shall contain non-empty <code>audio.m4a</code>.</p>
+<h3>FR-007 — technical metadata</h3>
+<p>A successful build shall contain <code>ffprobe.json</code> created from the normalized video.</p>
+<h3>FR-008 — captions-first transcript</h3>
+<p>The runtime shall attempt English subtitles/automatic captions before speech-to-text fallback.</p>
+<h3>FR-009 — optional Whisper fallback</h3>
+<p>Local Whisper shall only run when the operator explicitly supplies a valid executable and model path.</p>
+<h3>FR-010 — transcript failure honesty</h3>
+<p>A successful build shall not be emitted without a non-empty <code>transcript.txt</code>. Missing captions plus missing/invalid fallback shall remain an explicit failure.</p>
+<h3>FR-011 — transcript provenance</h3>
+<p>A successful build shall include <code>transcript-status.json</code> identifying the transcript path.</p>
+<h3>FR-012 — member manifest</h3>
+<p>A successful build shall include member path, byte count and SHA-256 for each tracked pack member.</p>
+<h3>FR-013 — independent checksum file</h3>
+<p>A successful build shall include <code>SHA256SUMS.txt</code> covering manifest and tracked members.</p>
+<h3>FR-014 — verification</h3>
+<p>The verifier shall reject missing required files, empty required files, incorrect sizes, incorrect hashes and unexplained regular files.</p>
+<h3>FR-015 — diagnostics</h3>
+<p><code>reasonpack doctor</code> shall expose missing required dependencies and invalid optional Whisper configuration.</p>
+<h3>FR-016 — self-test</h3>
+<p><code>reasonpack self-test</code> shall exercise positive verification and prove that unexplained files are rejected.</p>
+<h3>FR-017 — convenience invocation</h3>
+<p>The reference distribution shall support <code>yt URL</code> / <code>reasonpack URL</code> quick flow without removing the explicit <code>build URL OUT_DIR</code> command.</p>
+<h3>FR-018 — no hidden external side effects</h3>
+<p>The runtime shall not automatically upload, publish, invoke downstream AI, import browser cookies, or emit telemetry.</p>
+<h2>8. Non-functional requirements</h2>
+<h3>NFR-001 — inspectability</h3>
+<p>Pack members and documentation should remain usable with ordinary filesystem and text tools.</p>
+<h3>NFR-002 — portability</h3>
+<p>Reference installation shall target macOS and common Linux distributions directly, with Windows supported through WSL in this release.</p>
+<h3>NFR-003 — bounded dependency surface</h3>
+<p>Core runtime dependencies shall remain understandable and individually replaceable.</p>
+<h3>NFR-004 — integrity</h3>
+<p>Verification failure shall be loud and actionable rather than automatically “repairing” expected hashes.</p>
+<h3>NFR-005 — local-first privacy posture</h3>
+<p>Transformation, transcript fallback and verification should run locally. Network use is required for source acquisition only unless a later feature explicitly changes that contract.</p>
+<h3>NFR-006 — documentation completeness</h3>
+<p>The distribution shall explain purpose, current capability, architecture, dependencies, installation, operations, troubleshooting, security/rights, roadmap and success measures.</p>
+<h2>9. Acceptance criteria for this reference kit</h2>
+<p>A supported technical user should be able to:</p>
+<ol>
+<li>unpack the kit;</li>
+<li>understand CURRENT vs future capability without reading the shell source;</li>
+<li>run the correct OS installer;</li>
+<li>open a new shell and pass <code>reasonpack doctor</code>;</li>
+<li>pass <code>reasonpack self-test</code>;</li>
+<li>verify the included synthetic example;</li>
+<li>build one authorized public source when network/source availability permits;</li>
+<li>verify the resulting pack later;</li>
+<li>explain what each canonical member is for;</li>
+<li>explain at least three things a SHA-256 verification does <strong>not</strong> prove.</li>
+</ol>
+<h2>10. Product risks</h2>
+<h3>Remote-source volatility</h3>
+<p>YouTube formats, metadata, captions and site behavior change. Mitigation: keep acquisition behind <code>yt-dlp</code>, record tool/version evidence, and preserve completed packs when exact evidence matters.</p>
+<h3>Rights misuse</h3>
+<p>Technical access may be mistaken for redistribution permission. Mitigation: rights boundary is explicit throughout the package; no auto-publication exists.</p>
+<h3>Transcript overconfidence</h3>
+<p>Automatic captions or Whisper inference may contain errors. Mitigation: preserve provenance and do not label transcript as verified truth.</p>
+<h3>Dependency drift</h3>
+<p><code>yt-dlp</code> and <code>ffmpeg</code> change rapidly. Mitigation: doctor/version capture, self-test, future compatibility matrix and release qualification.</p>
+<h3>Scope creep</h3>
+<p>The product could become a media platform, knowledge graph, AI orchestration system and cloud registry all at once. Mitigation: keep derived context, storage and execution as adapters/layers with separate contracts.</p>
+<h2>11. Open product questions</h2>
+<ul>
+<li>Should the canonical pack eventually have one top-level content identity in addition to member hashes?</li>
+<li>What is the minimum useful signed-manifest model for team handoff?</li>
+<li>Should source captions be preserved in original format(s) beyond one selected VTT?</li>
+<li>What derived-context schema is useful without contaminating the source-evidence layer?</li>
+<li>When is native Windows support worth the maintenance cost versus WSL?</li>
+<li>What enterprise proxy/certificate configuration can be supported without accepting browser credential import?</li>
+</ul>
+<p>These are product decisions, not hidden assumptions in v1.</p>
+</section><section id="vision-strategy" data-title="vision &amp; strategy"><div class="doc-kicker">VISION_STRATEGY.md</div><h1>Vision and Strategic Direction</h1>
+<h2>North star</h2>
+<p><strong>Make valuable external knowledge easier to carry forward than to rediscover.</strong></p>
+<p>ReasonPack starts with YouTube because video is a common place where useful context is abundant but awkward to reuse. The strategic idea is broader: external information should be capturable into durable context artifacts that preserve enough source evidence to support later reasoning without binding that reasoning to one model or session.</p>
+<h2>The strategic problem</h2>
+<p>Most AI-assisted work has a continuity tax.</p>
+<p>A person finds a useful source, watches it, explains it to one model, moves to another model, re-explains it, later returns to the topic, reconstructs the source again, and eventually has a folder of transcripts and summaries whose provenance nobody remembers.</p>
+<p>That is not a model-quality problem. It is a context-lifecycle problem.</p>
+<h2>Strategic principles</h2>
+<h3>Capture once, reason many times</h3>
+<p>If source acquisition and transcript preparation are expensive, do them once and preserve the useful result.</p>
+<h3>Source before synthesis</h3>
+<p>Derived interpretations should point back to stable source evidence. The system should make it harder, not easier, for a summary to become detached from the material it summarized.</p>
+<h3>Portable before proprietary</h3>
+<p>Ordinary files and hashes are intentionally unsophisticated. They travel well.</p>
+<h3>Verification before trust theater</h3>
+<p>A green checkmark should correspond to a concrete property. In v1 that property is byte integrity and package closure, not “this transcript is true.”</p>
+<h3>Local-first by default</h3>
+<p>Do not require a cloud control plane merely to transform and verify source material.</p>
+<h3>Composable rather than monolithic</h3>
+<p>ReasonPack should hand off cleanly to storage, search, derived context, Skills, Execution Packets, or AI tools without becoming all of them.</p>
+<h2>Product wedge</h2>
+<p>The adoption wedge is intentionally simple:</p>
+<pre><code class="language-text">yt URL
+</code></pre>
+<p>A user gets immediate practical value: one organized, verifiable context package.</p>
+<p>The deeper architecture becomes visible only after the tool proves useful:</p>
+<pre><code class="language-text">source
+  ↓
+ReasonPack
+  ↓
+durable context
+  ↓
+(optional) derived analysis
+  ↓
+(optional) Execution Packet
+  ↓
+capable executor
+  ↓
+receipt
+</code></pre>
+<h2>Why this matters for engineering teams</h2>
+<p>The value is not merely transcript convenience. A good source package can reduce repeated context preparation and improve handoff quality across:</p>
+<ul>
+<li>architecture research;</li>
+<li>design reviews;</li>
+<li>technology scouting;</li>
+<li>internal enablement;</li>
+<li>training material development;</li>
+<li>AI-assisted implementation planning;</li>
+<li>evidence-backed technical decisions.</li>
+</ul>
+<h2>Strategic success condition</h2>
+<p>ReasonPack succeeds strategically when the team begins to treat <strong>reusable context as an engineering asset</strong> rather than disposable prompt input.</p>
+<p>That does not mean saving everything forever. It means preserving context when the cost of rediscovery is meaningfully greater than the cost of keeping it well.</p>
+<h2>Strategic boundaries</h2>
+<p>The vision does not require ReasonPack itself to become:</p>
+<ul>
+<li>a knowledge-management platform;</li>
+<li>a universal scraper;</li>
+<li>a proprietary AI interface;</li>
+<li>a workflow engine;</li>
+<li>a publication platform.</li>
+</ul>
+<p>If another system already does one of those jobs well, ReasonPack should interoperate with it.</p>
+<h2>Long-term option value</h2>
+<p>A verified context artifact creates options:</p>
+<ul>
+<li>consume it in different AI tools;</li>
+<li>attach it to an architecture record;</li>
+<li>derive a structured learning artifact;</li>
+<li>register it in a governed knowledge plane;</li>
+<li>reference exact members from an Execution Packet;</li>
+<li>preserve it as evidence for a decision.</li>
+</ul>
+<p>The strategic advantage is not ownership of every downstream workflow. It is <strong>keeping the source-derived context durable enough that downstream choices remain open</strong>.</p>
+</section><section id="architecture" data-title="architecture"><div class="doc-kicker">ARCHITECTURE.md</div><h1>Architecture</h1>
+<h2>Architectural objective</h2>
+<p>ReasonPack exists to make <strong>source-derived context portable and inspectable without making the current AI session, model, or provider the system of record</strong>.</p>
+<p>The architecture therefore separates five concerns that are often mashed together in ad hoc AI workflows:</p>
+<ol>
+<li>source admission;</li>
+<li>source acquisition;</li>
+<li>local normalization and transcript creation;</li>
+<li>evidence packaging;</li>
+<li>later reasoning or execution.</li>
+</ol>
+<p>Only the first four belong to the current ReasonPack runtime.</p>
+<h2>High-level flow</h2>
+<pre><code class="language-text">YouTube URL
+    │
+    ▼
+URL admission gate
+    │
+    ├── reject unsupported host
+    ▼
+yt-dlp inspection / acquisition
+    │
+    ├── source.json
+    ├── temporary downloaded source media
+    └── optional source captions
+    │
+    ▼
+Local normalization
+    │
+    ├── ffmpeg → video.mp4
+    ├── ffmpeg → audio.m4a
+    └── ffprobe → ffprobe.json
+    │
+    ▼
+Transcript strategy
+    │
+    ├── captions available → captions.vtt + transcript.txt
+    └── no captions → optional configured local Whisper
+    │
+    ▼
+Evidence seal
+    │
+    ├── transcript-status.json
+    ├── manifest.json
+    └── SHA256SUMS.txt
+    │
+    ▼
+Closed-pack verification
+    │
+    ▼
+Portable ReasonPack directory
+</code></pre>
+<p>See also <code>../diagrams/02-architecture-dependency-map.svg</code>.</p>
+<h2>Component model</h2>
+<h3>A. CLI / orchestration layer</h3>
+<p><strong>Component:</strong> <code>bin/reasonpack</code></p>
+<p>Responsibilities:</p>
+<ul>
+<li>command routing;</li>
+<li>URL validation;</li>
+<li>dependency detection;</li>
+<li>calling deterministic local tools;</li>
+<li>selecting transcript path;</li>
+<li>writing manifest/checksum evidence;</li>
+<li>verifying the final pack.</li>
+</ul>
+<p>The CLI is orchestration, not a media codec, downloader, speech model, or AI reasoning engine.</p>
+<h3>B. Acquisition adapter</h3>
+<p><strong>Component:</strong> <code>yt-dlp</code></p>
+<p>Responsibilities:</p>
+<ul>
+<li>inspect YouTube source metadata;</li>
+<li>download one source media representation;</li>
+<li>request available subtitles / automatic captions.</li>
+</ul>
+<p>Constraints:</p>
+<ul>
+<li>allowed host gate runs before acquisition;</li>
+<li>playlist expansion is disabled;</li>
+<li>private browser credentials/cookies are not imported by this reference runtime.</li>
+</ul>
+<h3>C. Media normalization adapter</h3>
+<p><strong>Components:</strong> <code>ffmpeg</code>, <code>ffprobe</code></p>
+<p>Responsibilities:</p>
+<ul>
+<li>create a broadly playable H.264/AAC MP4 analysis copy;</li>
+<li>create an AAC audio-only member;</li>
+<li>report technical stream/container metadata.</li>
+</ul>
+<p>ReasonPack records output bytes and tool version lines rather than assuming a transcode is identical across every future ffmpeg build or platform.</p>
+<h3>D. Transcript adapter</h3>
+<p>Two ordered strategies exist:</p>
+<ol>
+<li><strong>Source captions</strong> — preferred when available because they preserve a direct source-derived text path.</li>
+<li><strong>Local Whisper fallback</strong> — allowed only when explicitly configured by the operator.</li>
+</ol>
+<p>The transcript path is evidence-bearing. <code>transcript-status.json</code> must explain which strategy produced the transcript.</p>
+<h3>E. Integrity / package layer</h3>
+<p><strong>Components:</strong> Python standard library plus platform SHA-256 command when available.</p>
+<p>Responsibilities:</p>
+<ul>
+<li>calculate member sizes and hashes;</li>
+<li>produce <code>manifest.json</code>;</li>
+<li>produce <code>SHA256SUMS.txt</code>;</li>
+<li>verify required members;</li>
+<li>reject unexplained files.</li>
+</ul>
+<p>This is the layer that converts “a folder of downloaded stuff” into a bounded artifact.</p>
+<h2>Data contracts</h2>
+<h3>Input contract</h3>
+<p>Minimum input:</p>
+<pre><code class="language-text">one HTTP(S) URL whose hostname is in the explicit YouTube allowlist
+</code></pre>
+<p>Quick mode also accepts an optional output-root override.</p>
+<p>The source URL is not itself proof that the user has redistribution rights.</p>
+<h3>Canonical pack contract</h3>
+<p>Required evidence members are defined in <code>PACKAGE_CONTRACT.md</code>.</p>
+<p>The pack directory is intentionally closed. Derived notes, AI summaries, presentations, prompts, or research should normally live <strong>beside</strong> the canonical pack or in a derived artifact that references its identity.</p>
+<h3>Output identity</h3>
+<p>Current ReasonPack has no single semantic pack digest field. Instead it preserves:</p>
+<ul>
+<li>per-member byte size + SHA-256 in <code>manifest.json</code>;</li>
+<li><code>manifest.json</code> SHA-256 in <code>SHA256SUMS.txt</code>;</li>
+<li>checksums for each recorded member.</li>
+</ul>
+<p>A future signed/release identity can build on this without changing the meaning of the current manifest.</p>
+<h2>Trust boundaries</h2>
+<h3>Boundary 1: network source</h3>
+<p>Everything obtained from YouTube is external input. Source metadata, media and captions may change over time.</p>
+<p>ReasonPack does not assume a later rebuild from the same URL will produce byte-identical media. It records the bytes acquired in <strong>this</strong> pack.</p>
+<h3>Boundary 2: local deterministic tooling</h3>
+<p><code>ffmpeg</code>, <code>ffprobe</code>, Python and checksum tools transform/inspect local bytes. Their version lines are recorded in <code>manifest.json</code> where supported.</p>
+<h3>Boundary 3: speech inference</h3>
+<p>Local Whisper is inference. It is optional and must never be described as deterministic truth. The model binary is hashed so the pack records which model was used.</p>
+<h3>Boundary 4: downstream reasoning</h3>
+<p>Any later use by ChatGPT, Codex, Claude, Copilot or another system occurs <strong>outside</strong> ReasonPack’s current execution boundary.</p>
+<p>A downstream AI may summarize a transcript incorrectly. That does not change the source-evidence pack unless someone explicitly creates a new artifact/version.</p>
+<h2>Failure semantics</h2>
+<p>ReasonPack prefers an explicit incomplete/failure state over an apparently successful but misleading pack.</p>
+<p>Examples:</p>
+<ul>
+<li>Unsupported URL host → reject before acquisition.</li>
+<li>Missing required dependency → fail with a visible dependency error.</li>
+<li>Source media unavailable → build does not continue as if normalization succeeded.</li>
+<li>Captions absent and Whisper unavailable → write transcript status, then fail because required transcript evidence is missing.</li>
+<li>Whisper exits strangely but no transcript file exists → do not trust process exit alone; fail transcript establishment.</li>
+<li>Member hash/size drift → verification fails.</li>
+<li>Extra file added to canonical directory → verification fails.</li>
+</ul>
+<h2>Runtime boundaries and non-goals</h2>
+<p>The current architecture deliberately does not contain:</p>
+<ul>
+<li>account management;</li>
+<li>cookies/private source authentication;</li>
+<li>cloud storage;</li>
+<li>registry/database;</li>
+<li>AI summarization;</li>
+<li>vectorization;</li>
+<li>approval workflow;</li>
+<li>downstream model routing;</li>
+<li>publication.</li>
+</ul>
+<p>Keeping these outside the core makes the context artifact usable in environments that do not share the same provider stack.</p>
+<h2>Extension points</h2>
+<p>ReasonPack can evolve without turning into a monolith if extensions respect the boundaries:</p>
+<ul>
+<li><strong>New source adapter:</strong> requires a new explicit admission/rights model, not silent expansion of the YouTube gate.</li>
+<li><strong>Derived-context adapter:</strong> writes a separate derived artifact and references source-pack hashes.</li>
+<li><strong>Storage adapter:</strong> copies exact pack bytes and verifies readback; storage location does not become pack identity.</li>
+<li><strong>Execution Packet adapter:</strong> references verified pack members as exact work inputs and adds authority/acceptance semantics.</li>
+<li><strong>Signing adapter:</strong> signs a defined manifest/release identity without replacing per-member integrity.</li>
+</ul>
+<h2>Architectural invariant</h2>
+<p><strong>ReasonPack should remain useful even if every downstream AI provider changes tomorrow.</strong></p>
+<p>That is the design test. If using the pack requires one specific model, conversation UI, vendor account, or cloud repository, we have coupled context to execution again.</p>
+</section><section id="package-contract" data-title="package contract"><div class="doc-kicker">PACKAGE_CONTRACT.md</div><h1>ReasonPack Package Contract</h1>
+<h2>Purpose</h2>
+<p>This document defines what a successful <code>ghostmesh-reasoning-pack-v1</code> directory means in the current reference runtime.</p>
+<p>It is deliberately narrower than a general archival standard. The goal is a small, inspectable contract that a human or script can verify locally.</p>
+<h2>Required members</h2>
+<table>
+<thead>
+<tr>
+  <th>Member</th>
+  <th>Role</th>
+  <th style="text-align:right">Required</th>
+  <th>Evidence expectation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>video.mp4</code></td>
+  <td>normalized visual/audio analysis copy</td>
+  <td style="text-align:right">Yes</td>
+  <td>non-empty, size + SHA-256 tracked</td>
+</tr>
+<tr>
+  <td><code>audio.m4a</code></td>
+  <td>audio-only analysis member</td>
+  <td style="text-align:right">Yes</td>
+  <td>non-empty, size + SHA-256 tracked</td>
+</tr>
+<tr>
+  <td><code>transcript.txt</code></td>
+  <td>text used for later reasoning</td>
+  <td style="text-align:right">Yes</td>
+  <td>non-empty, provenance explained by transcript status</td>
+</tr>
+<tr>
+  <td><code>transcript-status.json</code></td>
+  <td>transcript provenance/status</td>
+  <td style="text-align:right">Yes</td>
+  <td>source-captions or local-fallback semantics</td>
+</tr>
+<tr>
+  <td><code>source.json</code></td>
+  <td>yt-dlp source metadata</td>
+  <td style="text-align:right">Yes</td>
+  <td>non-empty, exact bytes tracked</td>
+</tr>
+<tr>
+  <td><code>ffprobe.json</code></td>
+  <td>technical metadata for normalized video</td>
+  <td style="text-align:right">Yes</td>
+  <td>non-empty, exact bytes tracked</td>
+</tr>
+<tr>
+  <td><code>manifest.json</code></td>
+  <td>member inventory and source/tool context</td>
+  <td style="text-align:right">Yes</td>
+  <td>schema <code>ghostmesh-reasoning-pack-v1</code></td>
+</tr>
+<tr>
+  <td><code>SHA256SUMS.txt</code></td>
+  <td>independent checksum list</td>
+  <td style="text-align:right">Yes</td>
+  <td>includes manifest and tracked members</td>
+</tr>
+<tr>
+  <td><code>captions.vtt</code></td>
+  <td>original selected source caption file</td>
+  <td style="text-align:right">Conditional</td>
+  <td>included when source captions are used</td>
+</tr>
+</tbody>
+</table>
+<h2><code>manifest.json</code></h2>
+<p>Current shape:</p>
+<pre><code class="language-json">{
+  &quot;schema&quot;: &quot;ghostmesh-reasoning-pack-v1&quot;,
+  &quot;sourceUrl&quot;: &quot;https://www.youtube.com/watch?v=...&quot;,
+  &quot;tools&quot;: {
+    &quot;yt-dlp&quot;: &quot;...&quot;,
+    &quot;ffmpeg&quot;: &quot;...&quot;,
+    &quot;ffprobe&quot;: &quot;...&quot;,
+    &quot;python3&quot;: &quot;...&quot;
+  },
+  &quot;members&quot;: [
+    {
+      &quot;path&quot;: &quot;video.mp4&quot;,
+      &quot;sha256&quot;: &quot;&lt;64 lowercase hex characters&gt;&quot;,
+      &quot;bytes&quot;: 12345
+    }
+  ]
+}
+</code></pre>
+<p>The manifest tracks content members. It does not claim copyright rights, factual correctness or downstream approval.</p>
+<h2>Closed-directory rule</h2>
+<p>Verification computes the set:</p>
+<pre><code class="language-text">allowed regular files = manifest members + manifest.json + SHA256SUMS.txt
+</code></pre>
+<p>Any other regular file causes verification failure.</p>
+<p>Why this matters: a pack should not quietly accumulate analyst notes, hidden outputs, model summaries, screenshots and scratch files until nobody knows what the manifest actually covers.</p>
+<p>If you want to add derived work, use one of these patterns:</p>
+<pre><code class="language-text">Parent folder/
+├── source-reasonpack/        # canonical verified pack
+└── analysis/                 # derived work, not part of source pack
+</code></pre>
+<p>or create a separately versioned derived artifact with an explicit reference back to the pack/member hashes.</p>
+<h2>Transcript status semantics</h2>
+<h3>Source captions</h3>
+<p>Typical record:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;source-captions&quot;,
+  &quot;sourceFile&quot;: &quot;captions.vtt&quot;
+}
+</code></pre>
+<p>Meaning: <code>transcript.txt</code> was simplified from source-provided/automatic YouTube caption material retained in the pack.</p>
+<p>It does <strong>not</strong> mean captions are human-authored or error-free.</p>
+<h3>Local Whisper fallback</h3>
+<p>Record includes:</p>
+<ul>
+<li><code>status: local-whisper-fallback</code>;</li>
+<li>Whisper CLI path;</li>
+<li>model path;</li>
+<li>model SHA-256.</li>
+</ul>
+<p>Meaning: transcript text was inferred locally by the configured model.</p>
+<h3>No transcript capability</h3>
+<p>When captions are unavailable and no valid Whisper configuration exists, status is written but the build ultimately fails because a successful ReasonPack requires <code>transcript.txt</code>.</p>
+<h2>Integrity semantics</h2>
+<p>SHA-256 answers:</p>
+<blockquote>
+<p>“Are these bytes the same bytes recorded by this pack?”</p>
+</blockquote>
+<p>It does not answer:</p>
+<ul>
+<li>Is the video accurate?</li>
+<li>Is the speaker correct?</li>
+<li>Is the transcript semantically faithful?</li>
+<li>Is redistribution allowed?</li>
+<li>Is the source still available?</li>
+<li>Is a later rebuild from the same URL identical?</li>
+</ul>
+<p>Those are separate questions.</p>
+<h2>Rebuild semantics</h2>
+<p>ReasonPack is not currently a bit-for-bit remote-source reproducibility system. YouTube may change source encodes, captions, metadata, availability or adaptive stream selection. Tool versions may also change.</p>
+<p>Therefore:</p>
+<ul>
+<li>preserve the verified pack when exact evidence matters;</li>
+<li>do not assume rerunning the URL later recreates the same bytes;</li>
+<li>compare manifests if a source is reacquired;</li>
+<li>treat a changed pack as a new evidence snapshot rather than silently replacing the old one.</li>
+</ul>
+<h2>Safe modification rule</h2>
+<p>Never “fix” a failed verification by editing <code>SHA256SUMS.txt</code> or <code>manifest.json</code> to match unexplained changes unless your explicit intent is to create a <strong>new</strong> pack/version and you understand why the bytes changed.</p>
+<p>Verification is supposed to detect drift. Teaching it to ignore drift defeats the product.</p>
+</section><section id="requirements-traceability" data-title="requirements traceability"><div class="doc-kicker">REQUIREMENTS_TRACEABILITY.md</div><h1>Requirements Traceability</h1>
+<p>This matrix connects the PRD to the current reference implementation and evidence. It is intentionally honest about where a requirement is enforced by executable tests versus code inspection or documentation policy.</p>
+<h2>Evidence classes</h2>
+<ul>
+<li><strong>Automated:</strong> exercised by the included self-test/package test or verifier fixture.</li>
+<li><strong>Runtime enforced:</strong> explicit code path exists; not every external/network behavior is covered by the synthetic offline fixture.</li>
+<li><strong>Documentation/operating contract:</strong> a required product practice that is not yet mechanically enforced by the current runtime.</li>
+<li><strong>Roadmap:</strong> not current.</li>
+</ul>
+<table>
+<thead>
+<tr>
+  <th>PRD requirement</th>
+  <th>Current mechanism</th>
+  <th>Evidence class</th>
+  <th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>FR-001 source URL admission</td>
+  <td><code>validate_url()</code> host allowlist</td>
+  <td>Automated + runtime enforced</td>
+  <td>self-test accepts YouTube and rejects example.com</td>
+</tr>
+<tr>
+  <td>FR-002 single-source scope</td>
+  <td>all yt-dlp calls include <code>--no-playlist</code></td>
+  <td>Runtime enforced</td>
+  <td>should gain explicit static regression test in release CI</td>
+</tr>
+<tr>
+  <td>FR-003 inspect command</td>
+  <td><code>inspect()</code> uses <code>--dump-single-json --skip-download</code></td>
+  <td>Runtime enforced</td>
+  <td>requires network/source for full qualification</td>
+</tr>
+<tr>
+  <td>FR-004 media acquisition</td>
+  <td><code>build()</code> downloads <code>source.%(ext)s</code> and requires non-empty source</td>
+  <td>Runtime enforced</td>
+  <td>external-source behavior depends on yt-dlp/YouTube</td>
+</tr>
+<tr>
+  <td>FR-005 normalized video</td>
+  <td>ffmpeg H.264/AAC/yuv420p/+faststart command</td>
+  <td>Runtime enforced</td>
+  <td>future integration test should inspect real normalized fixture</td>
+</tr>
+<tr>
+  <td>FR-006 normalized audio</td>
+  <td>ffmpeg audio extraction to AAC M4A</td>
+  <td>Runtime enforced</td>
+  <td>non-empty member required by verifier</td>
+</tr>
+<tr>
+  <td>FR-007 technical metadata</td>
+  <td>ffprobe JSON output</td>
+  <td>Runtime enforced</td>
+  <td>non-empty member required by verifier</td>
+</tr>
+<tr>
+  <td>FR-008 captions-first transcript</td>
+  <td>caption acquisition precedes fallback</td>
+  <td>Runtime enforced</td>
+  <td>source-dependent external path</td>
+</tr>
+<tr>
+  <td>FR-009 explicit Whisper fallback</td>
+  <td>requires <code>WHISPER_CLI</code> + <code>WHISPER_MODEL</code></td>
+  <td>Runtime enforced</td>
+  <td><code>doctor</code> validates configured paths</td>
+</tr>
+<tr>
+  <td>FR-010 transcript failure honesty</td>
+  <td>successful build requires non-empty <code>transcript.txt</code></td>
+  <td>Runtime enforced</td>
+  <td>build returns failure when transcript cannot be established</td>
+</tr>
+<tr>
+  <td>FR-011 transcript provenance</td>
+  <td><code>transcript-status.json</code> required</td>
+  <td>Runtime enforced + verifier</td>
+  <td>status content varies by path</td>
+</tr>
+<tr>
+  <td>FR-012 member manifest</td>
+  <td>Python manifest writer in <code>build()</code></td>
+  <td>Runtime enforced</td>
+  <td>member hashes/sizes verified later</td>
+</tr>
+<tr>
+  <td>FR-013 checksum inventory</td>
+  <td><code>SHA256SUMS.txt</code> generated after manifest</td>
+  <td>Runtime enforced</td>
+  <td>verifier re-hashes every listed member</td>
+</tr>
+<tr>
+  <td>FR-014 verification</td>
+  <td><code>verify()</code></td>
+  <td>Automated</td>
+  <td>sample fixture + self-test, including unexplained-file rejection</td>
+</tr>
+<tr>
+  <td>FR-015 dependency diagnostics</td>
+  <td><code>doctor()</code></td>
+  <td>Runtime enforced</td>
+  <td>full matrix depends on host environment</td>
+</tr>
+<tr>
+  <td>FR-016 self-test</td>
+  <td><code>self_test()</code></td>
+  <td>Automated</td>
+  <td>included package test invokes it</td>
+</tr>
+<tr>
+  <td>FR-017 convenience invocation</td>
+  <td>URL dispatch to <code>quick()</code>; <code>yt</code>/<code>rp</code> wrappers</td>
+  <td>Runtime enforced</td>
+  <td>output naming depends on source metadata</td>
+</tr>
+<tr>
+  <td>FR-018 no hidden external side effects</td>
+  <td>no upload/publish/AI/cookie code in runtime</td>
+  <td>Runtime inspection + operating contract</td>
+  <td>future static policy test recommended</td>
+</tr>
+<tr>
+  <td>NFR-001 inspectability</td>
+  <td>ordinary files + JSON/text/hash records</td>
+  <td>Design/runtime property</td>
+  <td>no proprietary reader required</td>
+</tr>
+<tr>
+  <td>NFR-002 portability</td>
+  <td>macOS/Linux/WSL installers</td>
+  <td>Package qualification</td>
+  <td>native Windows is not current</td>
+</tr>
+<tr>
+  <td>NFR-003 bounded dependencies</td>
+  <td>Bash/Python/yt-dlp/ffmpeg/ffprobe/SHA</td>
+  <td>Design/runtime property</td>
+  <td>optional Whisper isolated</td>
+</tr>
+<tr>
+  <td>NFR-004 integrity</td>
+  <td>fail-closed verifier</td>
+  <td>Automated</td>
+  <td>negative extra-file case included</td>
+</tr>
+<tr>
+  <td>NFR-005 local-first privacy</td>
+  <td>no upload/AI core; local transform/verify</td>
+  <td>Runtime inspection + policy</td>
+  <td>source acquisition necessarily uses network</td>
+</tr>
+<tr>
+  <td>NFR-006 documentation completeness</td>
+  <td>reference documentation set</td>
+  <td>Package-level test</td>
+  <td>package test checks required documents are present</td>
+</tr>
+</tbody>
+</table>
+<h2>Current evidence gaps worth improving</h2>
+<p>The reference kit is stronger than a lone script, but it is not pretending to have exhaustive integration coverage.</p>
+<p>Useful R1 additions:</p>
+<ol>
+<li>static test that every yt-dlp acquisition path retains <code>--no-playlist</code>;</li>
+<li>real authorized network fixture for <code>inspect</code> and <code>build</code> in a controlled qualification environment;</li>
+<li>ffprobe assertions against the normalized real fixture;</li>
+<li>explicit captions-path and Whisper-path integration fixtures where redistribution permits;</li>
+<li>installer idempotency tests per supported OS image;</li>
+<li>static side-effect scan proving no upload/cookie/provider invocation enters the core;</li>
+<li>machine-readable doctor receipt for support automation.</li>
+</ol>
+<h2>Traceability rule for future changes</h2>
+<p>When a PR changes a PRD requirement:</p>
+<ul>
+<li>update the requirement text if semantics changed;</li>
+<li>update implementation;</li>
+<li>add or update test evidence;</li>
+<li>update this matrix;</li>
+<li>update CURRENT/NEXT posture if product capability changed.</li>
+</ul>
+<p>Do not leave a requirement marked “current” when the enforcing code or evidence has been removed.</p>
+</section><section id="decisions-tradeoffs" data-title="decisions &amp; tradeoffs"><div class="doc-kicker">DECISIONS_AND_TRADEOFFS.md</div><h1>Design Decisions and Tradeoffs</h1>
+<p>This is a compact decision record for choices that are easy to “simplify” later in ways that quietly change the product.</p>
+<h2>D1 — admit YouTube only in v1</h2>
+<p><strong>Decision:</strong> URL validation allows a small explicit set of YouTube hosts.</p>
+<p><strong>Why:</strong> the product needs one well-understood source boundary more than it needs generic downloader breadth.</p>
+<p><strong>Tradeoff:</strong> less convenient for Vimeo, training portals and arbitrary media URLs.</p>
+<p><strong>Revisit when:</strong> another source class has real demand and an explicit acquisition/rights/test model.</p>
+<h2>D2 — no playlist expansion</h2>
+<p><strong>Decision:</strong> every acquisition command uses <code>--no-playlist</code>.</p>
+<p><strong>Why:</strong> one invocation should correspond to one source identity and bounded cost.</p>
+<p><strong>Tradeoff:</strong> batch learning playlists require repeated calls today.</p>
+<p><strong>Revisit when:</strong> batch semantics include per-source identity, failure isolation and output structure.</p>
+<h2>D3 — captions before Whisper</h2>
+<p><strong>Decision:</strong> prefer available source subtitles/automatic captions; use Whisper only as explicit fallback.</p>
+<p><strong>Why:</strong> source captions provide a direct evidence path and avoid unnecessary inference/cost.</p>
+<p><strong>Tradeoff:</strong> automatic captions can be lower quality than a strong local speech model.</p>
+<p><strong>Mitigation:</strong> record transcript provenance so downstream users can decide when retranscription is warranted.</p>
+<h2>D4 — Whisper is explicit, local and optional</h2>
+<p><strong>Decision:</strong> no automatic model install/download.</p>
+<p><strong>Why:</strong> model size, licensing, performance, endpoint policy and data sensitivity vary.</p>
+<p><strong>Tradeoff:</strong> some users with captionless sources need extra setup.</p>
+<h2>D5 — normalize media</h2>
+<p><strong>Decision:</strong> produce H.264/AAC MP4 plus AAC audio rather than retaining arbitrary source formats as the core interface.</p>
+<p><strong>Why:</strong> downstream tools benefit from predictable formats.</p>
+<p><strong>Tradeoff:</strong> transcoding costs time/CPU and changes bytes from the original remote media representation.</p>
+<p><strong>Mitigation:</strong> preserve source metadata and clearly call outputs normalized analysis copies, not original archival masters.</p>
+<h2>D6 — close the pack under its manifest</h2>
+<p><strong>Decision:</strong> verifier rejects unexplained regular files.</p>
+<p><strong>Why:</strong> prevents source evidence and derived analysis from blurring together over time.</p>
+<p><strong>Tradeoff:</strong> users cannot casually drop notes into the same directory without failing verification.</p>
+<p><strong>Mitigation:</strong> document a sibling derived-analysis pattern.</p>
+<h2>D7 — hashes are integrity, not truth</h2>
+<p><strong>Decision:</strong> documentation consistently limits SHA-256 claims to byte identity.</p>
+<p><strong>Why:</strong> cryptographic vocabulary tends to inflate trust claims if left unchecked.</p>
+<p><strong>Tradeoff:</strong> requires more explicit explanation to non-security readers.</p>
+<h2>D8 — no automatic upload</h2>
+<p><strong>Decision:</strong> ReasonPack ends at local artifact creation/verification.</p>
+<p><strong>Why:</strong> storage introduces credentials, sharing, retention and organizational-policy boundaries.</p>
+<p><strong>Tradeoff:</strong> user must choose/call a storage path separately.</p>
+<p><strong>Revisit when:</strong> a storage adapter can preserve exact bytes and readback evidence without becoming the product’s identity plane.</p>
+<h2>D9 — WSL before native Windows</h2>
+<p><strong>Decision:</strong> use WSL as the current Windows route.</p>
+<p><strong>Why:</strong> reuses the Bash/Linux runtime and limits implementation divergence during early adoption.</p>
+<p><strong>Tradeoff:</strong> WSL may be disallowed or undesirable on some enterprise endpoints.</p>
+<p><strong>Revisit when:</strong> Windows adoption earns the maintenance cost of a native runtime.</p>
+<h2>D10 — no AI summary in the canonical v1 pack</h2>
+<p><strong>Decision:</strong> current pack is source-evidence oriented.</p>
+<p><strong>Why:</strong> derived reasoning has different provenance and can change with model/prompt versions.</p>
+<p><strong>Tradeoff:</strong> users still need a downstream reasoning step for concise summaries/topics.</p>
+<p><strong>Future rule:</strong> derived context should reference exact pack/member inputs and remain separable from source evidence.</p>
+<h2>D11 — record tool versions, do not pretend remote rebuilds are deterministic</h2>
+<p><strong>Decision:</strong> preserve tool version lines and member hashes for each completed pack.</p>
+<p><strong>Why:</strong> YouTube and tools change. The same URL later may yield different bytes.</p>
+<p><strong>Tradeoff:</strong> there is no promise of bit-identical reacquisition.</p>
+<p><strong>Operational consequence:</strong> preserve important verified packs rather than treating the URL as sufficient evidence.</p>
+<h2>D12 — keep downstream execution separate</h2>
+<p><strong>Decision:</strong> ReasonPack does not choose or invoke an AI executor.</p>
+<p><strong>Why:</strong> context should remain reusable when model/provider selection changes.</p>
+<p><strong>Tradeoff:</strong> one more explicit handoff step exists today.</p>
+<p><strong>Strategic consequence:</strong> an Execution Packet can govern a particular job without redefining the source artifact.</p>
+</section><section id="what-good-looks-like" data-title="what good looks like"><div class="doc-kicker">WHAT_GOOD_LOOKS_LIKE.md</div><h1>What Good Looks Like</h1>
+<p>This document is the quality bar, not a list of implementation tasks.</p>
+<h2>1. Good source handling</h2>
+<p>A good ReasonPack begins with a source whose identity is explicit.</p>
+<p>Good means:</p>
+<ul>
+<li>source URL is recorded;</li>
+<li>source host is inside the admitted boundary;</li>
+<li>one invocation means one source;</li>
+<li>source metadata is preserved;</li>
+<li>acquisition failures remain visible;</li>
+<li>technical accessibility is never treated as redistribution permission.</li>
+</ul>
+<p>Bad looks like:</p>
+<ul>
+<li>a mystery MP4 with no source record;</li>
+<li>browser-cookie scraping hidden in a convenience command;</li>
+<li>a playlist downloaded because the URL happened to point at one;</li>
+<li>a local filename being treated as provenance.</li>
+</ul>
+<h2>2. Good transcript handling</h2>
+<p>Good means the recipient can answer:</p>
+<blockquote>
+<p>“Where did this text come from?”</p>
+</blockquote>
+<p>The answer should be either source captions or a recorded local speech-inference path.</p>
+<p>Good does <strong>not</strong> mean pretending automatic captions are perfect. Transcript provenance and transcript accuracy are different qualities.</p>
+<h2>3. Good artifact integrity</h2>
+<p>A good pack has:</p>
+<ul>
+<li>non-empty required members;</li>
+<li>explicit byte counts;</li>
+<li>SHA-256 for every tracked member;</li>
+<li>independent checksum inventory;</li>
+<li>no unexplained regular files;</li>
+<li>a verifier that fails on drift.</li>
+</ul>
+<p>The verifier is not a spell that makes content trustworthy. It is a precise answer to a precise question: “Are these the bytes we recorded?”</p>
+<h2>4. Good user experience</h2>
+<p>A capable user should not need the author standing beside them.</p>
+<p>A good handoff makes these tasks obvious:</p>
+<ul>
+<li>install;</li>
+<li>check dependencies;</li>
+<li>self-test;</li>
+<li>inspect a source;</li>
+<li>build a pack;</li>
+<li>find the output;</li>
+<li>verify it later;</li>
+<li>understand common failures;</li>
+<li>remove or update the tool.</li>
+</ul>
+<p>The happy path should be short. The explanation behind it should still exist for people who need to reason about the system.</p>
+<h2>5. Good failure behavior</h2>
+<p>A good tool says <strong>no</strong> when the evidence contract cannot be satisfied.</p>
+<p>Examples:</p>
+<ul>
+<li>no transcript path → fail;</li>
+<li>invalid Whisper configuration → doctor fails;</li>
+<li>hash mismatch → verify fails;</li>
+<li>unexplained file → verify fails;</li>
+<li>unsupported URL → reject.</li>
+</ul>
+<p>A failed job with a clear reason is more useful than a successful job with fabricated completeness.</p>
+<h2>6. Good architecture</h2>
+<p>Good architecture keeps these layers separate:</p>
+<ul>
+<li>source acquisition;</li>
+<li>normalization;</li>
+<li>transcript generation;</li>
+<li>evidence packaging;</li>
+<li>derived reasoning;</li>
+<li>downstream execution;</li>
+<li>storage/publication.</li>
+</ul>
+<p>The first four form the current ReasonPack core. The others are integrations or future layers.</p>
+<h2>7. Good portability</h2>
+<p>The artifact should remain useful even when the original machine is gone.</p>
+<p>That means:</p>
+<ul>
+<li>ordinary files;</li>
+<li>documented formats;</li>
+<li>hashes;</li>
+<li>no hidden database requirement;</li>
+<li>no dependency on one AI vendor;</li>
+<li>no requirement to call back to a ReasonPack service to read the pack.</li>
+</ul>
+<h2>8. Good security and rights posture</h2>
+<p>Good means:</p>
+<ul>
+<li>no secret/cookie import by default;</li>
+<li>no automatic upload;</li>
+<li>no telemetry merely because it is fashionable;</li>
+<li>local Whisper stays local;</li>
+<li>pack classification follows the sensitivity of its source;</li>
+<li>rights are a user/organizational decision, not inferred from download success.</li>
+</ul>
+<h2>9. Good product discipline</h2>
+<p>The package must distinguish:</p>
+<ul>
+<li>what exists now;</li>
+<li>what is planned next;</li>
+<li>what is explicitly not part of the product.</li>
+</ul>
+<p>A roadmap bullet is not a shipped feature. A poster is not a contract. A demo is not production telemetry.</p>
+<h2>10. Good engineering handoff</h2>
+<p>The recipient should be able to answer all of the following without calling the author:</p>
+<ol>
+<li>What problem does this solve?</li>
+<li>Who is it for?</li>
+<li>What exactly does it do today?</li>
+<li>What does it deliberately not do?</li>
+<li>What are its dependencies?</li>
+<li>How do I install it on my OS?</li>
+<li>What files does it create and why?</li>
+<li>How do I prove a pack has not changed?</li>
+<li>What are the important trust boundaries?</li>
+<li>What failures are expected and how do I diagnose them?</li>
+<li>How is success measured?</li>
+<li>What decisions shaped the design?</li>
+<li>How can it evolve without becoming a monolith?</li>
+<li>Where does it fit with broader AI execution patterns?</li>
+</ol>
+<p>If the package answers those questions, documentation has done useful work. If it merely repeats function names, it has not.</p>
+</section><section id="success-metrics" data-title="success metrics"><div class="doc-kicker">SUCCESS_METRICS.md</div><h1>Success Measures</h1>
+<h2>Measurement posture</h2>
+<p>These are <strong>proposed product measures and quality gates</strong>, not claims about historical production performance. The reference runtime contains no adoption telemetry, and this package will not invent metrics merely to make a dashboard look inhabited.</p>
+<p>Where possible, measure from explicit local test/build receipts or team-reported usage until a justified telemetry design exists.</p>
+<h2>1. Reliability measures</h2>
+<h3>Pack verification integrity</h3>
+<p><strong>Metric:</strong> percentage of accepted qualification fixtures that pass exact pack verification.</p>
+<p><strong>Target:</strong> 100% for maintained release fixtures.</p>
+<p>A release with a fixture that cannot verify should not ship as qualified.</p>
+<h3>Silent hash drift</h3>
+<p><strong>Metric:</strong> number of cases where changed bytes are accepted without manifest/checksum update.</p>
+<p><strong>Target:</strong> 0.</p>
+<h3>Silent transcript success</h3>
+<p><strong>Metric:</strong> number of builds classified successful without a non-empty transcript and transcript-status evidence.</p>
+<p><strong>Target:</strong> 0.</p>
+<h3>Untracked-file acceptance</h3>
+<p><strong>Metric:</strong> number of unexplained regular files accepted by <code>verify</code>.</p>
+<p><strong>Target:</strong> 0.</p>
+<h3>Self-test health</h3>
+<p><strong>Metric:</strong> supported environments passing <code>reasonpack self-test</code> after installation.</p>
+<p><strong>Target:</strong> 100% of environments claimed as supported for a release.</p>
+<h2>2. Usability measures</h2>
+<h3>Time to first verified pack</h3>
+<p>Measure from a clean supported host where approved package repositories/network access are available.</p>
+<p>Suggested target:</p>
+<ul>
+<li>dependency/bootstrap + doctor/self-test: under 10 minutes for a typical technical user;</li>
+<li>first source build time is tracked separately because it depends materially on source duration, network and CPU.</li>
+</ul>
+<p>Do <strong>not</strong> use a single “under two minutes” marketing target for all videos. That would confuse source/runtime cost with UX quality.</p>
+<h3>Author-assistance rate</h3>
+<p><strong>Metric:</strong> percentage of first-time technical users who require direct author intervention to complete install + self-test + first build.</p>
+<p>Desired direction: down over successive releases.</p>
+<h3>Command-path simplicity</h3>
+<p>A routine user should normally need:</p>
+<pre><code class="language-text">install → doctor → self-test → yt URL
+</code></pre>
+<p>The existence of detailed docs should not lengthen the happy path.</p>
+<h2>3. Portability measures</h2>
+<h3>OS support qualification</h3>
+<p>Track separately:</p>
+<ul>
+<li>macOS installer qualification;</li>
+<li>Linux distribution/package-manager qualification;</li>
+<li>Windows/WSL bootstrap qualification;</li>
+<li>future native Windows qualification.</li>
+</ul>
+<p>“Works on Windows” must not be used as shorthand when only WSL is qualified.</p>
+<h3>Downstream readability</h3>
+<p>A completed pack should be usable as ordinary local files without ReasonPack running.</p>
+<p>Measure by confirming that manifest, transcript, metadata and normalized media can be opened by standard tools on supported environments.</p>
+<h2>4. Evidence quality measures</h2>
+<h3>Provenance completeness</h3>
+<p>For a successful pack, require:</p>
+<ul>
+<li>source URL;</li>
+<li>source metadata;</li>
+<li>transcript-status path;</li>
+<li>tool version evidence where available;</li>
+<li>member byte count;</li>
+<li>member SHA-256;</li>
+<li>checksum inventory.</li>
+</ul>
+<h3>Evidence truthfulness</h3>
+<p>Count instances where a system or user incorrectly claims more than evidence supports, such as labeling captions “verified transcript” or treating hash verification as content truth.</p>
+<p>Target: 0 in maintained documentation and automated output.</p>
+<h2>5. Privacy and security measures</h2>
+<h3>Automatic external side effects</h3>
+<p>Target for current core:</p>
+<ul>
+<li>automatic upload: 0;</li>
+<li>automatic publication: 0;</li>
+<li>telemetry emission: 0;</li>
+<li>browser-cookie import: 0;</li>
+<li>automatic downstream AI execution: 0.</li>
+</ul>
+<h3>Secret material in pack</h3>
+<p>The canonical pack should not need API keys or browser credentials. Any future credential-bearing workflow belongs outside the source-evidence artifact.</p>
+<h2>6. Adoption measures</h2>
+<p>Until a justified telemetry model exists, gather deliberately lightweight evidence:</p>
+<ul>
+<li>number of explicit installs known to the team;</li>
+<li>packs built for real work;</li>
+<li>repeat users;</li>
+<li>verification failures by category;</li>
+<li>downstream workflows that reused a pack instead of reacquiring the source;</li>
+<li>qualitative developer feedback;</li>
+<li>cases where a pack prevented source/context reconstruction.</li>
+</ul>
+<p>The most meaningful early adoption signal is <strong>repeat use without author involvement</strong>.</p>
+<h2>7. Strategic measures</h2>
+<p>ReasonPack is strategically valuable if it reduces repeated source preparation.</p>
+<p>Potential later measures:</p>
+<ul>
+<li>frequency of one pack reused across multiple AI surfaces;</li>
+<li>avoided duplicate transcription/acquisition events;</li>
+<li>percentage of derived artifacts that retain an exact source-pack reference;</li>
+<li>percentage of governed work packets that reuse existing context artifacts instead of re-ingesting sources.</li>
+</ul>
+<p>These should only be instrumented when the measurement cost and privacy tradeoff are justified.</p>
+<h2>8. Release scorecard</h2>
+<p>A release candidate should answer:</p>
+<table>
+<thead>
+<tr>
+  <th>Area</th>
+  <th>Release question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Reliability</td>
+  <td>Do fixtures, self-test and verifier all pass?</td>
+</tr>
+<tr>
+  <td>Portability</td>
+  <td>Are every claimed OS/runtime paths actually qualified?</td>
+</tr>
+<tr>
+  <td>Evidence</td>
+  <td>Does transcript and member provenance remain explicit?</td>
+</tr>
+<tr>
+  <td>Security</td>
+  <td>Did any new credential/network side effect enter the core?</td>
+</tr>
+<tr>
+  <td>UX</td>
+  <td>Can a new user reach a verified pack without undocumented steps?</td>
+</tr>
+<tr>
+  <td>Docs</td>
+  <td>Do current behavior and roadmap remain clearly separated?</td>
+</tr>
+</tbody>
+</table>
+<p>A release is not “good” because the executable runs on the author’s laptop. It is good when the recipient can operate it with the documented contract intact.</p>
+</section><section id="dependencies" data-title="dependencies"><div class="doc-kicker">DEPENDENCIES.md</div><h1>Dependency Map</h1>
+<h2>Dependency philosophy</h2>
+<p>ReasonPack delegates specialized work to mature local tools rather than reimplementing media/network/speech stacks in one script.</p>
+<p>The important design rule is that dependencies remain <strong>explicit and inspectable</strong>. The runtime does not silently install them. Installation is an operator-owned action performed by the bootstrap scripts or an enterprise-approved software process.</p>
+<h2>Required runtime dependencies</h2>
+<table>
+<thead>
+<tr>
+  <th>Dependency</th>
+  <th style="text-align:right">Required</th>
+  <th>Product role</th>
+  <th>Why it exists</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Bash</td>
+  <td style="text-align:right">Yes</td>
+  <td>CLI/orchestration runtime</td>
+  <td>current ReasonPack implementation is a Bash executable</td>
+</tr>
+<tr>
+  <td>Python 3</td>
+  <td style="text-align:right">Yes</td>
+  <td>URL validation, JSON/manifest/hash logic</td>
+  <td>uses standard library; avoids additional Python runtime packages in core</td>
+</tr>
+<tr>
+  <td><code>yt-dlp</code></td>
+  <td style="text-align:right">Yes</td>
+  <td>source metadata/media/caption acquisition</td>
+  <td>isolates YouTube/site adaptation behind a mature acquisition tool</td>
+</tr>
+<tr>
+  <td><code>ffmpeg</code></td>
+  <td style="text-align:right">Yes</td>
+  <td>video/audio normalization</td>
+  <td>produces stable local analysis formats</td>
+</tr>
+<tr>
+  <td><code>ffprobe</code></td>
+  <td style="text-align:right">Yes</td>
+  <td>normalized media metadata</td>
+  <td>records technical stream/container facts</td>
+</tr>
+<tr>
+  <td>SHA-256 facility</td>
+  <td style="text-align:right">Yes</td>
+  <td>integrity</td>
+  <td><code>shasum</code>, <code>sha256sum</code>, or Python fallback</td>
+</tr>
+<tr>
+  <td>network access to source</td>
+  <td style="text-align:right">Build only</td>
+  <td>YouTube acquisition</td>
+  <td>inspect/build cannot work offline against a remote URL</td>
+</tr>
+</tbody>
+</table>
+<h2>Optional dependency</h2>
+<table>
+<thead>
+<tr>
+  <th>Dependency</th>
+  <th style="text-align:right">Required</th>
+  <th>Role</th>
+  <th>Activation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>whisper-cli</code></td>
+  <td style="text-align:right">No</td>
+  <td>speech-to-text fallback</td>
+  <td>only when captions are absent and operator explicitly configures it</td>
+</tr>
+<tr>
+  <td>Whisper model file</td>
+  <td style="text-align:right">No</td>
+  <td>local speech model</td>
+  <td><code>WHISPER_MODEL</code> must reference an existing local file</td>
+</tr>
+</tbody>
+</table>
+<p>Whisper is intentionally not installed by the standard ReasonPack runtime or default bootstrap because model choice, size, licensing, performance and enterprise software policy vary materially.</p>
+<h2>No downstream-AI dependency</h2>
+<p>None of these are required to build or verify a ReasonPack:</p>
+<ul>
+<li>ChatGPT;</li>
+<li>Codex;</li>
+<li>Claude;</li>
+<li>Microsoft Copilot;</li>
+<li>GitHub Copilot;</li>
+<li>SharePlane;</li>
+<li>Google Drive;</li>
+<li>an LLM API key.</li>
+</ul>
+<p>Those systems may consume or store the resulting artifact later.</p>
+<h2>Operating-system mapping</h2>
+<h3>macOS</h3>
+<p>Reference bootstrap uses Homebrew for:</p>
+<ul>
+<li><code>yt-dlp</code>;</li>
+<li><code>ffmpeg</code> / <code>ffprobe</code>;</li>
+<li>Python 3.</li>
+</ul>
+<p>Bash and <code>shasum</code> are normally present, but the runtime also has a Python SHA-256 fallback.</p>
+<h3>Debian/Ubuntu family</h3>
+<p>Reference bootstrap uses apt for:</p>
+<ul>
+<li><code>ffmpeg</code>;</li>
+<li>Python 3;</li>
+<li>Python venv support;</li>
+<li>CA certificates.</li>
+</ul>
+<p><code>yt-dlp</code> is installed inside a user-local ReasonPack Python venv so the product does not depend on the distribution shipping a sufficiently current package.</p>
+<h3>Fedora/RHEL family</h3>
+<p>Reference bootstrap uses <code>dnf</code> for ffmpeg, Python/pip and CA certificates. <code>ffmpeg</code> availability depends on the organization’s enabled RPM repositories. The installer fails with guidance instead of configuring third-party repositories automatically.</p>
+<h3>Arch family</h3>
+<p>Reference bootstrap uses <code>pacman</code> for ffmpeg, Python and pip, then creates the user-local venv for <code>yt-dlp</code>.</p>
+<h3>Windows</h3>
+<p>The current supported architecture is <strong>WSL</strong>, not native PowerShell execution.</p>
+<p>PowerShell is only a bootstrap entry point. The actual ReasonPack runtime and dependencies execute inside the selected WSL Linux distribution.</p>
+<h2>User-local installation paths</h2>
+<p>The reference installers use:</p>
+<pre><code class="language-text">~/.local/share/reasonpack/reasonpack
+~/.local/share/reasonpack/venv/        # Linux/WSL yt-dlp environment
+~/.local/bin/reasonpack
+~/.local/bin/yt
+~/.local/bin/rp
+</code></pre>
+<p>macOS Homebrew provides <code>yt-dlp</code>; Linux/WSL link the venv’s <code>yt-dlp</code> into <code>~/.local/bin</code>.</p>
+<h2>Dependency version posture</h2>
+<p>The current runtime records tool version lines in <code>manifest.json</code>, but this reference kit does <strong>not</strong> pin every third-party tool to one exact version.</p>
+<p>Why:</p>
+<ul>
+<li>YouTube changes frequently and <code>yt-dlp</code> currency can matter;</li>
+<li>ffmpeg packaging differs across OS distributions;</li>
+<li>a false “universal pinned version” would not guarantee identical remote-source acquisition anyway.</li>
+</ul>
+<p>Future release engineering should maintain a tested compatibility floor/range per supported OS rather than pretending version drift does not exist.</p>
+<h2>Enterprise dependency concerns</h2>
+<p>Before broad rollout, validate:</p>
+<ul>
+<li>approved package repositories;</li>
+<li>outbound proxy behavior;</li>
+<li>TLS interception/custom CA requirements;</li>
+<li>executable allowlisting;</li>
+<li>local storage policy;</li>
+<li>ffmpeg codec/package availability;</li>
+<li>WSL policy on managed Windows devices;</li>
+<li>local Whisper/model licensing and storage if enabled.</li>
+</ul>
+<p>See <code>SUPPORT_MATRIX.md</code> and <code>INSTALLATION.md</code>.</p>
+</section><section id="support-matrix" data-title="support matrix"><div class="doc-kicker">SUPPORT_MATRIX.md</div><h1>Support Matrix</h1>
+<h2>Meaning of support labels</h2>
+<ul>
+<li><strong>Reference-supported:</strong> an install/bootstrap path is included and the runtime architecture is intentionally designed for it.</li>
+<li><strong>Conditional:</strong> expected to work when OS repositories/policies provide dependencies, but environment-specific qualification is required.</li>
+<li><strong>Not current:</strong> no first-class runtime/support claim is made.</li>
+</ul>
+<p>This is a reference distribution, not an SLA-bearing production product.</p>
+<h2>Runtime matrix</h2>
+<table>
+<thead>
+<tr>
+  <th>Environment</th>
+  <th>Posture</th>
+  <th>Installation path</th>
+  <th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>macOS on Apple Silicon</td>
+  <td>Reference-supported</td>
+  <td><code>install-macos.sh</code></td>
+  <td>Homebrew dependency model</td>
+</tr>
+<tr>
+  <td>macOS on Intel</td>
+  <td>Conditional</td>
+  <td><code>install-macos.sh</code></td>
+  <td>architecture is compatible; validate current Homebrew/package availability</td>
+</tr>
+<tr>
+  <td>Ubuntu/Debian Linux</td>
+  <td>Reference-supported</td>
+  <td><code>install-linux.sh</code></td>
+  <td>apt dependencies + user-local yt-dlp venv</td>
+</tr>
+<tr>
+  <td>Fedora/RHEL-like Linux</td>
+  <td>Conditional</td>
+  <td><code>install-linux.sh</code></td>
+  <td>ffmpeg may require organization-approved RPM repository</td>
+</tr>
+<tr>
+  <td>Arch-like Linux</td>
+  <td>Conditional</td>
+  <td><code>install-linux.sh</code></td>
+  <td>pacman path included</td>
+</tr>
+<tr>
+  <td>Windows 11 + WSL Ubuntu</td>
+  <td>Reference-supported architecture</td>
+  <td><code>install-windows-wsl.ps1</code> → <code>install-wsl.sh</code></td>
+  <td>ReasonPack runs inside Linux, not native Windows</td>
+</tr>
+<tr>
+  <td>Native Windows without WSL</td>
+  <td>Not current</td>
+  <td>none</td>
+  <td>roadmap item</td>
+</tr>
+<tr>
+  <td>Containers</td>
+  <td>Not packaged</td>
+  <td>manual</td>
+  <td>core should work in a Bash/Python/ffmpeg/yt-dlp image, but no supported image is shipped</td>
+</tr>
+</tbody>
+</table>
+<h2>Shell posture</h2>
+<p>The executable is Bash. POSIX <code>sh</code>, Fish, PowerShell and cmd.exe are not direct runtime targets.</p>
+<p>Convenience profile integration currently targets:</p>
+<ul>
+<li><code>~/.zshrc</code> on macOS;</li>
+<li><code>~/.bashrc</code> on Linux by default;</li>
+<li><code>~/.zshrc</code> on Linux if <code>$SHELL</code> indicates zsh.</li>
+</ul>
+<h2>Network posture</h2>
+<table>
+<thead>
+<tr>
+  <th>Operation</th>
+  <th style="text-align:right">Network required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>reasonpack doctor</code></td>
+  <td style="text-align:right">No</td>
+</tr>
+<tr>
+  <td><code>reasonpack self-test</code></td>
+  <td style="text-align:right">No</td>
+</tr>
+<tr>
+  <td><code>reasonpack verify</code></td>
+  <td style="text-align:right">No</td>
+</tr>
+<tr>
+  <td>open local documentation</td>
+  <td style="text-align:right">No</td>
+</tr>
+<tr>
+  <td><code>reasonpack inspect URL</code></td>
+  <td style="text-align:right">Yes</td>
+</tr>
+<tr>
+  <td><code>reasonpack build URL OUT_DIR</code></td>
+  <td style="text-align:right">Yes for source acquisition</td>
+</tr>
+<tr>
+  <td><code>yt URL</code></td>
+  <td style="text-align:right">Yes for metadata + source acquisition</td>
+</tr>
+<tr>
+  <td>local Whisper fallback</td>
+  <td style="text-align:right">No after model is installed</td>
+</tr>
+</tbody>
+</table>
+<h2>Downstream compatibility posture</h2>
+<p>A ReasonPack is ordinary files, so downstream systems can generally consume individual members according to their own file-upload rules. This kit does not claim every AI UI accepts the full directory or every media size.</p>
+<p>The portable unit is the filesystem package and its evidence, not a guarantee about a particular vendor’s upload limit.</p>
+<h2>Qualification required before enterprise rollout</h2>
+<p>Do not turn “reference-supported” into “enterprise-supported” without validating:</p>
+<ul>
+<li>corporate endpoint controls;</li>
+<li>proxy/TLS path;</li>
+<li>software distribution mechanism;</li>
+<li>supported ffmpeg codecs;</li>
+<li>local storage quotas;</li>
+<li>source/rights policy;</li>
+<li>WSL posture;</li>
+<li>update/removal lifecycle;</li>
+<li>help/support ownership.</li>
+</ul>
+</section><section id="installation" data-title="installation"><div class="doc-kicker">INSTALLATION.md</div><h1>Installation and Removal Guide</h1>
+<h2>Before you install</h2>
+<p>ReasonPack writes a small user-local executable and shell aliases. The bootstrap may also install operating-system packages.</p>
+<p>If you are on a managed corporate endpoint, use your organization’s approved software distribution/repository process when required. Do not bypass endpoint controls merely to make the demo work.</p>
+<h2>What the reference installers change</h2>
+<h3>Common</h3>
+<p>The installers copy the reference executable to:</p>
+<pre><code class="language-text">~/.local/share/reasonpack/reasonpack
+</code></pre>
+<p>and expose:</p>
+<pre><code class="language-text">~/.local/bin/reasonpack
+~/.local/bin/yt
+~/.local/bin/rp
+</code></pre>
+<p>They add <code>~/.local/bin</code> to the appropriate shell profile when the package marker is not already present.</p>
+<h3>macOS dependency behavior</h3>
+<p><code>install/install-macos.sh</code> requires Homebrew. It installs these formulae only when missing:</p>
+<ul>
+<li><code>yt-dlp</code></li>
+<li><code>ffmpeg</code></li>
+<li><code>python</code></li>
+</ul>
+<p>It does not automatically upgrade already-installed packages solely because a newer version exists.</p>
+<h3>Linux dependency behavior</h3>
+<p><code>install/install-linux.sh</code> detects:</p>
+<ul>
+<li>apt;</li>
+<li>dnf;</li>
+<li>pacman.</li>
+</ul>
+<p>It installs ffmpeg/Python prerequisites through the OS package manager and creates:</p>
+<pre><code class="language-text">~/.local/share/reasonpack/venv
+</code></pre>
+<p>for a user-local <code>yt-dlp</code> installation.</p>
+<p>The script does <strong>not</strong> add third-party RPM repositories when ffmpeg is unavailable. That is an enterprise/operator policy decision.</p>
+<h3>Windows behavior</h3>
+<p><code>install/install-windows-wsl.ps1</code> is a bootstrap into WSL.</p>
+<p>If WSL is already installed, it maps the kit directory into Linux and runs the Linux installer.</p>
+<p>If WSL is absent, the script exits with instructions. An administrator may explicitly rerun with <code>-InstallWSL</code> if enterprise policy permits.</p>
+<p>A Windows restart may be required after first enabling WSL.</p>
+<h2>macOS installation</h2>
+<p>From the unpacked kit:</p>
+<pre><code class="language-bash">chmod +x install/install-macos.sh
+./install/install-macos.sh
+</code></pre>
+<p>Open a new Terminal afterward, then run:</p>
+<pre><code class="language-bash">reasonpack doctor
+reasonpack self-test
+</code></pre>
+<p>Expected outcome: required commands are reported available and self-test prints a PASS message.</p>
+<h3>macOS without Homebrew</h3>
+<p>This reference package does not install Homebrew automatically. Install dependencies through an approved method, place them on <code>PATH</code>, then manually install the ReasonPack script if necessary.</p>
+<p>ReasonPack itself has no Homebrew-specific runtime requirement. Homebrew is simply the reference dependency bootstrap on macOS.</p>
+<h2>Ubuntu/Debian installation</h2>
+<pre><code class="language-bash">chmod +x install/install-linux.sh
+./install/install-linux.sh
+</code></pre>
+<p>The script may request <code>sudo</code> for OS package installation. The ReasonPack executable and yt-dlp venv remain user-local.</p>
+<p>Open a new shell, then:</p>
+<pre><code class="language-bash">reasonpack doctor
+reasonpack self-test
+</code></pre>
+<h2>Fedora/RHEL-family installation</h2>
+<p>Use the same Linux script:</p>
+<pre><code class="language-bash">./install/install-linux.sh
+</code></pre>
+<p>If ffmpeg is unavailable in your approved repository configuration, the installer will stop. Configure the approved repository through your normal endpoint process, then rerun.</p>
+<p>The kit intentionally does not install a random third-party repository on your behalf.</p>
+<h2>Arch-family installation</h2>
+<pre><code class="language-bash">./install/install-linux.sh
+</code></pre>
+<p>The pacman path installs ffmpeg/Python prerequisites and then creates the local yt-dlp venv.</p>
+<h2>Windows 11 with WSL</h2>
+<p>From PowerShell in the unpacked directory:</p>
+<pre><code class="language-powershell">Set-ExecutionPolicy -Scope Process Bypass
+.\install\install-windows-wsl.ps1
+</code></pre>
+<p><code>Set-ExecutionPolicy -Scope Process</code> affects only the current PowerShell process.</p>
+<p>If WSL is not installed and policy permits:</p>
+<pre><code class="language-powershell">.\install\install-windows-wsl.ps1 -InstallWSL
+</code></pre>
+<p>After WSL installation/restart, rerun the normal bootstrap.</p>
+<p>Then enter WSL and verify:</p>
+<pre><code class="language-bash">reasonpack doctor
+reasonpack self-test
+</code></pre>
+<h2>Optional Whisper configuration</h2>
+<p>ReasonPack does not silently install speech models.</p>
+<p>After separately installing an approved <code>whisper-cli</code> and model:</p>
+<pre><code class="language-bash">export WHISPER_CLI=&quot;$HOME/path/to/whisper-cli&quot;
+export WHISPER_MODEL=&quot;$HOME/path/to/ggml-model.bin&quot;
+reasonpack doctor
+</code></pre>
+<p>Persist those environment variables only if that is appropriate for your workstation and model location.</p>
+<p><code>doctor</code> should report <code>whisper configured</code>.</p>
+<h2>First real build</h2>
+<pre><code class="language-bash">yt &quot;https://www.youtube.com/watch?v=VIDEO_ID&quot;
+</code></pre>
+<p>Or choose an exact output directory:</p>
+<pre><code class="language-bash">reasonpack build \
+  &quot;https://www.youtube.com/watch?v=VIDEO_ID&quot; \
+  &quot;$HOME/Desktop/My ReasonPack&quot;
+</code></pre>
+<h2>Verify installation without network</h2>
+<p>The kit includes a synthetic example:</p>
+<pre><code class="language-bash">reasonpack verify examples/sample-reasonpack
+</code></pre>
+<p>and package-level tests:</p>
+<pre><code class="language-bash">./tests/test-package.sh
+</code></pre>
+<p>The package test does not prove YouTube is reachable. It proves local script syntax and verification behavior.</p>
+<h2>Manual removal</h2>
+<h3>Remove ReasonPack executable/aliases</h3>
+<pre><code class="language-bash">rm -f ~/.local/bin/reasonpack ~/.local/bin/yt ~/.local/bin/rp
+rm -rf ~/.local/share/reasonpack
+</code></pre>
+<p>On Linux/WSL this removes the ReasonPack-specific yt-dlp venv too.</p>
+<h3>Remove shell profile block</h3>
+<p>Remove the block labeled:</p>
+<pre><code class="language-text"># &gt;&gt;&gt; REASONPACK REF KIT &gt;&gt;&gt;
+...
+# &lt;&lt;&lt; REASONPACK REF KIT &lt;&lt;&lt;
+</code></pre>
+<p>from <code>~/.zshrc</code> or <code>~/.bashrc</code>.</p>
+<h3>Do not automatically uninstall shared dependencies</h3>
+<p>Homebrew/OS packages such as Python and ffmpeg may be used by other tools. This kit intentionally does not provide a script that blindly removes them.</p>
+<h2>Upgrade posture</h2>
+<p>The reference kit does not yet ship an automatic updater. For a new release:</p>
+<ol>
+<li>retain any ReasonPacks you care about;</li>
+<li>inspect the new release/change log;</li>
+<li>rerun the new installer;</li>
+<li>run <code>doctor</code> and <code>self-test</code>;</li>
+<li>verify an existing pack to confirm backward compatibility.</li>
+</ol>
+<p>See <code>ROADMAP.md</code> for lifecycle improvements.</p>
+</section><section id="user-guide" data-title="user guide"><div class="doc-kicker">USER_GUIDE.md</div><h1>User Guide</h1>
+<h2>Mental model</h2>
+<p>ReasonPack is easiest to use if you think in three commands:</p>
+<pre><code class="language-text">inspect → build → verify
+</code></pre>
+<p>The <code>yt URL</code> shortcut simply combines metadata-based output naming with the normal build path.</p>
+<h2>1. Check your workstation</h2>
+<pre><code class="language-bash">reasonpack doctor
+</code></pre>
+<p>This reports:</p>
+<ul>
+<li>ReasonPack version;</li>
+<li>yt-dlp availability/version;</li>
+<li>ffmpeg availability/version;</li>
+<li>ffprobe availability/version;</li>
+<li>Python availability/version;</li>
+<li>SHA-256 mechanism;</li>
+<li>optional Whisper configuration state.</li>
+</ul>
+<p>Resolve required <code>MISSING</code> entries before a real build.</p>
+<h2>2. Run the self-test</h2>
+<pre><code class="language-bash">reasonpack self-test
+</code></pre>
+<p>This is safe and offline. It proves basic runtime behavior and closed-pack verification.</p>
+<p>Run it after installation and after meaningful dependency/runtime changes.</p>
+<h2>3. Inspect a source before download</h2>
+<pre><code class="language-bash">reasonpack inspect &quot;https://www.youtube.com/watch?v=VIDEO_ID&quot; &gt; source-preview.json
+</code></pre>
+<p>This does not download the video. It retrieves metadata through yt-dlp.</p>
+<p>Useful preflight questions:</p>
+<ul>
+<li>Is this the intended source?</li>
+<li>Is the video ID correct?</li>
+<li>Is the duration reasonable for the task?</li>
+<li>Do I have authority/permission to acquire and analyze it?</li>
+</ul>
+<h2>4. Build with the quick command</h2>
+<pre><code class="language-bash">yt &quot;https://www.youtube.com/watch?v=VIDEO_ID&quot;
+</code></pre>
+<p>Default root:</p>
+<pre><code class="language-text">${REASONPACK_ROOT:-~/Desktop/Reasoning Packs}
+</code></pre>
+<p>Folder naming uses source title plus video ID so two similarly named videos are less likely to collide semantically.</p>
+<p>Example shape:</p>
+<pre><code class="language-text">~/Desktop/Reasoning Packs/
+└── Example Architecture Talk [abc123]/
+    ├── video.mp4
+    ├── audio.m4a
+    ├── transcript.txt
+    ├── transcript-status.json
+    ├── source.json
+    ├── ffprobe.json
+    ├── captions.vtt        # when source captions are used
+    ├── manifest.json
+    └── SHA256SUMS.txt
+</code></pre>
+<h2>5. Build to an exact directory</h2>
+<p>Use explicit build mode when output location matters:</p>
+<pre><code class="language-bash">reasonpack build \
+  &quot;https://www.youtube.com/watch?v=VIDEO_ID&quot; \
+  &quot;/absolute/or/relative/output/path&quot;
+</code></pre>
+<p>The directory is created if needed.</p>
+<p>Avoid building into a directory that already contains unrelated regular files. The final closed-pack verifier will reject unexplained files.</p>
+<h2>6. Read transcript provenance first</h2>
+<p>Before relying on <code>transcript.txt</code>, inspect:</p>
+<pre><code class="language-bash">cat transcript-status.json
+</code></pre>
+<h3><code>source-captions</code></h3>
+<p>The transcript was simplified from the retained VTT captions.</p>
+<h3><code>local-whisper-fallback</code></h3>
+<p>The transcript came from local speech inference. The status record includes model identity information.</p>
+<p>Automatic captions and speech recognition can both be wrong. Use the audio/video when exact wording matters.</p>
+<h2>7. Verify a pack later</h2>
+<pre><code class="language-bash">reasonpack verify &quot;/path/to/pack&quot;
+</code></pre>
+<p>Expected success:</p>
+<pre><code class="language-text">PASS reasoning pack verification
+</code></pre>
+<p>Run verification:</p>
+<ul>
+<li>before handing the pack to someone else;</li>
+<li>after copying it between storage systems;</li>
+<li>before using it as exact downstream work input;</li>
+<li>when a teammate says “I think somebody added a file to this folder.”</li>
+</ul>
+<h2>8. Keep derived analysis outside the canonical pack</h2>
+<p>Do not drop <code>summary.md</code>, <code>notes.txt</code>, screenshots or model outputs into a verified ReasonPack directory unless you are intentionally creating a new artifact/version and updating its contract.</p>
+<p>Recommended:</p>
+<pre><code class="language-text">Research Case/
+├── source-reasonpack/
+└── derived-analysis/
+    ├── summary.md
+    ├── architecture-notes.md
+    └── prompts.md
+</code></pre>
+<p>This preserves the distinction between source evidence and interpretation.</p>
+<h2>9. Configure a custom default output root</h2>
+<pre><code class="language-bash">export REASONPACK_ROOT=&quot;$HOME/Documents/Reasoning Packs&quot;
+</code></pre>
+<p>Then <code>yt URL</code> writes beneath that root.</p>
+<p>For a shared/cloud-synced folder, first consider source sensitivity, sync policy and storage size. ReasonPack itself does not require or assume cloud storage.</p>
+<h2>10. Optional local Whisper fallback</h2>
+<p>Configure only when you have an approved local executable/model:</p>
+<pre><code class="language-bash">export WHISPER_CLI=/path/to/whisper-cli
+export WHISPER_MODEL=/path/to/model.bin
+reasonpack doctor
+</code></pre>
+<p>When source captions are available they remain the preferred path in the current runtime.</p>
+<h2>11. What to hand another AI tool</h2>
+<p>It depends on the task and vendor upload limits.</p>
+<p>Typical minimal reasoning input:</p>
+<ul>
+<li><code>transcript.txt</code>;</li>
+<li><code>source.json</code>;</li>
+<li><code>transcript-status.json</code>;</li>
+<li><code>manifest.json</code>.</li>
+</ul>
+<p>For visual or audio analysis, include <code>video.mp4</code> or <code>audio.m4a</code> if the target surface accepts them.</p>
+<p>Do not assume a downstream model read every file merely because you uploaded a directory or archive. That is the downstream system’s execution concern.</p>
+<h2>12. Example verification workflow after copying</h2>
+<pre><code class="language-bash"># source workstation
+reasonpack verify &quot;$PACK&quot;
+
+# copy using your approved method
+# ...
+
+# destination workstation
+reasonpack verify &quot;$COPIED_PACK&quot;
+</code></pre>
+<p>If the destination fails verification, investigate the bytes. Do not update hashes merely to silence the error.</p>
+<h2>Command reference</h2>
+<pre><code class="language-text">reasonpack doctor
+    Check local required/optional dependencies.
+
+reasonpack inspect URL
+    Return source metadata without downloading media.
+
+reasonpack build URL OUT_DIR
+    Build one exact ReasonPack into OUT_DIR.
+
+reasonpack verify OUT_DIR
+    Validate pack schema, members, sizes, hashes and closure.
+
+reasonpack self-test
+    Offline local runtime/verification sanity test.
+
+reasonpack URL [OUTPUT_ROOT]
+yt URL [OUTPUT_ROOT]
+rp URL [OUTPUT_ROOT]
+    Convenience quick-build mode.
+</code></pre>
+<h2>Operational habit worth keeping</h2>
+<p>When a source becomes important to a decision, <strong>preserve the verified pack you used</strong>. A remote source can change or disappear. The URL is a locator; it is not a durable copy of the evidence you actually reasoned over.</p>
+</section><section id="operating-model" data-title="operating model"><div class="doc-kicker">OPERATING_MODEL.md</div><h1>Operating Model</h1>
+<h2>Lifecycle</h2>
+<p>A ReasonPack has a simple lifecycle:</p>
+<pre><code class="language-text">candidate source
+    ↓ inspect
+admitted one-source request
+    ↓ build
+local pack candidate
+    ↓ verify
+verified ReasonPack
+    ↓ optional copy/reuse
+verified ReasonPack elsewhere
+    ↓ optional derived work
+separate analysis / Execution Packet / publication
+</code></pre>
+<h2>Roles</h2>
+<p>This reference package assumes lightweight roles rather than a formal service organization.</p>
+<h3>User / source owner</h3>
+<p>Responsible for:</p>
+<ul>
+<li>choosing the source;</li>
+<li>confirming use is authorized;</li>
+<li>deciding source sensitivity;</li>
+<li>selecting output/storage location;</li>
+<li>deciding which downstream systems may consume the pack.</li>
+</ul>
+<h3>Tool / runtime</h3>
+<p>Responsible for:</p>
+<ul>
+<li>enforcing source gate;</li>
+<li>performing documented transformations;</li>
+<li>recording evidence;</li>
+<li>failing when pack requirements cannot be satisfied;</li>
+<li>never silently expanding authority.</li>
+</ul>
+<h3>Product maintainer</h3>
+<p>Responsible for:</p>
+<ul>
+<li>dependency compatibility;</li>
+<li>release tests;</li>
+<li>documentation correctness;</li>
+<li>current/roadmap distinction;</li>
+<li>security/rights posture;</li>
+<li>deciding when source/runtime scope expands.</li>
+</ul>
+<h2>Normal operating procedure</h2>
+<h3>Before build</h3>
+<pre><code class="language-bash">reasonpack doctor
+</code></pre>
+<p>For a new/unfamiliar source:</p>
+<pre><code class="language-bash">reasonpack inspect &quot;URL&quot;
+</code></pre>
+<h3>Build</h3>
+<pre><code class="language-bash">yt &quot;URL&quot;
+</code></pre>
+<p>or explicit output:</p>
+<pre><code class="language-bash">reasonpack build &quot;URL&quot; OUT_DIR
+</code></pre>
+<h3>Acceptance</h3>
+<p>A build is accepted only when the final verifier succeeds.</p>
+<p>The existence of <code>video.mp4</code> alone is not completion.</p>
+<h3>Handoff</h3>
+<p>Before copying/sharing:</p>
+<pre><code class="language-bash">reasonpack verify PACK_DIR
+</code></pre>
+<p>After copying, verify again where practical.</p>
+<h3>Derived work</h3>
+<p>Keep interpretation outside the canonical pack. Preserve a reference to pack/member hashes when derived work becomes important.</p>
+<h2>Failure triage order</h2>
+<ol>
+<li>Does <code>reasonpack self-test</code> pass?</li>
+<li>Does <code>reasonpack doctor</code> show all required dependencies?</li>
+<li>Does <code>reasonpack inspect URL</code> succeed?</li>
+<li>Did acquisition produce source media?</li>
+<li>Which transcript path was attempted?</li>
+<li>Does final verification identify drift or extra files?</li>
+</ol>
+<p>This ordering prevents network/source failures from being confused with local package-verifier regressions.</p>
+<h2>Update model</h2>
+<p>No auto-updater exists today.</p>
+<p>Treat executable updates like a small tool release:</p>
+<ol>
+<li>inspect change log;</li>
+<li>install new candidate;</li>
+<li>run doctor;</li>
+<li>run self-test;</li>
+<li>verify existing fixture/known pack;</li>
+<li>build a qualification source if needed.</li>
+</ol>
+<p>Existing ReasonPacks are data artifacts and should not be rewritten merely because the runtime updates.</p>
+<h2>Support/escalation payload</h2>
+<p>A useful support request contains:</p>
+<ul>
+<li>OS/runtime;</li>
+<li>ReasonPack version;</li>
+<li><code>reasonpack doctor</code> output;</li>
+<li>command class (<code>inspect</code>, <code>build</code>, <code>verify</code>);</li>
+<li>sanitized error output;</li>
+<li>whether self-test passes;</li>
+<li>source URL only if sharing it is appropriate;</li>
+<li>no credentials/cookies.</li>
+</ul>
+<h2>Service posture</h2>
+<p>This reference kit is local developer tooling. It does not currently define:</p>
+<ul>
+<li>uptime SLA;</li>
+<li>central service owner/on-call;</li>
+<li>remote state recovery;</li>
+<li>centralized telemetry.</li>
+</ul>
+<p>If adoption grows, those are product-operating-model decisions rather than assumptions to bury in the script.</p>
+</section><section id="troubleshooting" data-title="troubleshooting"><div class="doc-kicker">TROUBLESHOOTING.md</div><h1>Troubleshooting Guide</h1>
+<p>Start with:</p>
+<pre><code class="language-bash">reasonpack doctor
+reasonpack self-test
+</code></pre>
+<p>Those two commands separate local runtime problems from source/network problems quickly.</p>
+<h2>Quick diagnostic table</h2>
+<table>
+<thead>
+<tr>
+  <th>Symptom</th>
+  <th>Likely cause</th>
+  <th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>missing dependency: yt-dlp</code></td>
+  <td>install/profile path incomplete</td>
+  <td>rerun installer, open new shell, inspect <code>PATH</code></td>
+</tr>
+<tr>
+  <td><code>missing dependency: ffmpeg</code></td>
+  <td>OS dependency unavailable</td>
+  <td>install from approved repository</td>
+</tr>
+<tr>
+  <td>URL rejected</td>
+  <td>host outside allowlist</td>
+  <td>use canonical YouTube URL or treat new source support as a product change</td>
+</tr>
+<tr>
+  <td>build stops with transcript unavailable</td>
+  <td>no captions and no valid Whisper fallback</td>
+  <td>configure local Whisper or use another authorized transcript source in a future explicit workflow</td>
+</tr>
+<tr>
+  <td>verify reports hash/size failure</td>
+  <td>pack bytes changed</td>
+  <td>compare against source copy; rebuild/reacquire only if intended</td>
+</tr>
+<tr>
+  <td>verify reports untracked files</td>
+  <td>derived/scratch file added to canonical directory</td>
+  <td>move it outside pack or create a new derived artifact</td>
+</tr>
+<tr>
+  <td>WSL bootstrap fails</td>
+  <td>WSL disabled/policy issue</td>
+  <td>enable through approved Windows process</td>
+</tr>
+<tr>
+  <td>dnf cannot install ffmpeg</td>
+  <td>repository not enabled</td>
+  <td>use organization-approved RPM repository</td>
+</tr>
+<tr>
+  <td>source download fails</td>
+  <td>YouTube/network/yt-dlp issue</td>
+  <td>inspect network, source availability, yt-dlp currency</td>
+</tr>
+</tbody>
+</table>
+<h2>Dependency problems</h2>
+<h3><code>reasonpack: command not found</code></h3>
+<p>Check:</p>
+<pre><code class="language-bash">ls -l ~/.local/bin/reasonpack
+printf '%s\n' &quot;$PATH&quot; | tr ':' '\n'
+</code></pre>
+<p>If <code>~/.local/bin</code> is missing from PATH, open a new shell or source the relevant profile:</p>
+<pre><code class="language-bash">source ~/.zshrc   # zsh
+source ~/.bashrc  # bash
+</code></pre>
+<h3><code>yt-dlp</code> missing after Linux installation</h3>
+<p>The Linux installer places yt-dlp in a ReasonPack-specific venv and symlinks it into <code>~/.local/bin</code>.</p>
+<p>Check:</p>
+<pre><code class="language-bash">ls -l ~/.local/share/reasonpack/venv/bin/yt-dlp
+ls -l ~/.local/bin/yt-dlp
+</code></pre>
+<p>If the venv is damaged, remove only the ReasonPack venv and rerun the Linux installer.</p>
+<h3><code>ffmpeg</code> missing on Fedora/RHEL family</h3>
+<p>ReasonPack will not enable an unapproved third-party RPM repository automatically.</p>
+<p>Use the repository configuration approved for your environment, then rerun:</p>
+<pre><code class="language-bash">reasonpack doctor
+</code></pre>
+<h2>Source admission problems</h2>
+<h3><code>rejected source URL host</code></h3>
+<p>ReasonPack currently accepts canonical YouTube hosts only.</p>
+<p>This is intentional. Do not work around it by editing the URL-validation function for one source and then call the package “supported.” Adding another provider is a product/rights/security decision and should come with an adapter contract and tests.</p>
+<h3>Playlist URL only acquires one video</h3>
+<p>This is expected. <code>--no-playlist</code> is part of the source-scope contract.</p>
+<p>Batch/playlist intake is a future feature, not a bug workaround.</p>
+<h2>Acquisition problems</h2>
+<h3>yt-dlp reports unavailable formats or site changes</h3>
+<p>First check:</p>
+<pre><code class="language-bash">yt-dlp --version
+reasonpack inspect &quot;URL&quot;
+</code></pre>
+<p>YouTube changes often. A current yt-dlp build may be required.</p>
+<p>On managed endpoints, update through the approved package/software process rather than downloading arbitrary executables into PATH.</p>
+<h3>Enterprise proxy blocks access</h3>
+<p>ReasonPack does not currently contain an enterprise proxy abstraction.</p>
+<p>Use your approved system/package/network configuration. Do not solve proxy restrictions by importing browser cookies or credentials into the tool unless a future explicit security design authorizes that behavior.</p>
+<h2>Transcript problems</h2>
+<h3><code>transcript unavailable; see transcript-status.json</code></h3>
+<p>Inspect:</p>
+<pre><code class="language-bash">cat transcript-status.json
+</code></pre>
+<p>If the status is <code>missing-captions-and-no-whisper-fallback</code>, the source had no selected captions and local Whisper was not configured.</p>
+<p>Configure Whisper only if desired/approved, then rebuild into a clean output directory.</p>
+<h3><code>whisper INVALID CONFIGURATION</code></h3>
+<p>Run:</p>
+<pre><code class="language-bash">printf 'WHISPER_CLI=%s\n' &quot;$WHISPER_CLI&quot;
+printf 'WHISPER_MODEL=%s\n' &quot;$WHISPER_MODEL&quot;
+test -x &quot;$WHISPER_CLI&quot; &amp;&amp; echo cli-ok
+test -f &quot;$WHISPER_MODEL&quot; &amp;&amp; echo model-ok
+</code></pre>
+<p>The CLI must be executable and the model path must be a regular file.</p>
+<h3>Transcript exists but wording seems wrong</h3>
+<p>That is a content-quality issue, not a pack-integrity issue.</p>
+<p>Check <code>transcript-status.json</code>, then compare the questionable passage against <code>captions.vtt</code>, audio or video.</p>
+<p>Do not “correct” <code>transcript.txt</code> inside the canonical pack without intentionally creating a new artifact/version. A corrected transcript is derived work and should preserve its relationship to the original evidence.</p>
+<h2>Verification problems</h2>
+<h3>Extra file rejected</h3>
+<p>Example:</p>
+<pre><code class="language-text">untracked pack members: ['summary.md']
+</code></pre>
+<p>This is expected. Move derived work outside the canonical pack.</p>
+<h3>SHA-256 mismatch</h3>
+<p>Do not edit the checksum file first.</p>
+<p>Investigate:</p>
+<ol>
+<li>Which member changed?</li>
+<li>Was the pack copied through a system that transformed content?</li>
+<li>Did someone intentionally edit the file?</li>
+<li>Is the original verified pack still available?</li>
+</ol>
+<p>If the new bytes are intended, create a new pack/version and record the change.</p>
+<h3>Byte count mismatch</h3>
+<p>Treat it like hash drift. A truncated or replaced file must not be accepted just because its filename is unchanged.</p>
+<h2>Windows / WSL problems</h2>
+<h3><code>wsl.exe</code> not found</h3>
+<p>WSL is not enabled or available. If policy permits, use the documented <code>-InstallWSL</code> option from elevated PowerShell. Otherwise use your enterprise software-management path.</p>
+<h3>Kit is on a Windows path with spaces</h3>
+<p>The PowerShell bootstrap uses <code>wslpath</code> to translate the package path. If your environment has custom WSL mounts/policies, copy the kit to a simple local development directory and retry.</p>
+<h3><code>reasonpack</code> works inside WSL but not PowerShell</h3>
+<p>Expected. The current runtime is inside WSL. Native PowerShell/cmd execution is not a current feature.</p>
+<h2>Useful exit/status classes in the reference script</h2>
+<p>The script uses distinct non-zero boundaries for common classes, including:</p>
+<ul>
+<li>usage error: 64;</li>
+<li>unsupported URL: validation failure before build;</li>
+<li>missing required dependency: 20;</li>
+<li>source media not established: build boundary around 30;</li>
+<li>transcript not established: build boundary around 31;</li>
+<li>malformed/missing pack contract: verification boundary around 40;</li>
+<li>self-test regressions: 90/91 class.</li>
+</ul>
+<p>Callers should treat any non-zero result as failure and should not assume every future version preserves every numeric code unless the contract is formalized further.</p>
+<h2>When to escalate instead of debugging locally forever</h2>
+<p>Escalate when:</p>
+<ul>
+<li>a previously qualified source class fails across multiple known-good systems;</li>
+<li>yt-dlp/site behavior changed materially;</li>
+<li>verification fails on an untouched known-good fixture;</li>
+<li>dependency installation requires a new repository/security exception;</li>
+<li>a requested feature would expand source authority or credential access;</li>
+<li>the only proposed fix is to weaken verification.</li>
+</ul>
+<p>A good escalation includes <code>reasonpack doctor</code> output, command used, failure text, OS, and whether the included self-test passes. Do not include credentials/cookies.</p>
+</section><section id="security-rights" data-title="security &amp; rights"><div class="doc-kicker">SECURITY_RIGHTS.md</div><h1>Security, Rights, Privacy and Data Handling</h1>
+<h2>Security posture in one sentence</h2>
+<p>ReasonPack is a <strong>local source-acquisition and evidence-packaging utility</strong>, not an authentication bypass, rights engine, cloud service, or secret-bearing agent.</p>
+<h2>1. Source rights</h2>
+<p>Use ReasonPack only for material you own or are authorized or legally permitted to download and analyze.</p>
+<p>A successful <code>yt-dlp</code> request proves technical accessibility. It does not prove:</p>
+<ul>
+<li>redistribution rights;</li>
+<li>public-domain status;</li>
+<li>training/reuse permission;</li>
+<li>employer authorization;</li>
+<li>compliance with a platform’s terms for a particular use.</li>
+</ul>
+<p>Those decisions remain with the user/organization.</p>
+<h2>2. Private/authenticated content</h2>
+<p>The current reference runtime does not import:</p>
+<ul>
+<li>browser cookies;</li>
+<li>saved sessions;</li>
+<li>account credentials;</li>
+<li>OAuth tokens;</li>
+<li>API keys.</li>
+</ul>
+<p>Do not bolt those onto the command line as a convenience shortcut and still describe the security posture as unchanged.</p>
+<p>Private-source support would require a separate threat model, credential lifecycle and data-classification design.</p>
+<h2>3. Network behavior</h2>
+<p>Network access is expected for:</p>
+<ul>
+<li>source inspection;</li>
+<li>media acquisition;</li>
+<li>caption acquisition.</li>
+</ul>
+<p>Normal transform/verify/self-test work is local after dependencies/source material are present.</p>
+<p>The core performs no automatic pack upload, analytics callback or downstream AI invocation.</p>
+<h2>4. Local data sensitivity</h2>
+<p>A pack may contain:</p>
+<ul>
+<li>full video/audio;</li>
+<li>full transcript;</li>
+<li>source metadata;</li>
+<li>technical metadata.</li>
+</ul>
+<p>Therefore the pack should inherit at least the sensitivity/classification of the source material.</p>
+<p>Do not place a sensitive pack into a consumer-sync folder merely because <code>REASONPACK_ROOT</code> supports arbitrary local paths.</p>
+<h2>5. Transcript privacy</h2>
+<p>Local Whisper fallback keeps inference local in this design. That is useful for privacy, but it does not automatically make the workflow compliant with every enterprise data-handling policy.</p>
+<p>Validate:</p>
+<ul>
+<li>local model approval;</li>
+<li>endpoint storage policy;</li>
+<li>source classification;</li>
+<li>retention requirements.</li>
+</ul>
+<h2>6. Integrity versus authenticity</h2>
+<p>SHA-256 verifies byte identity against the pack’s own recorded values.</p>
+<p>The current package is not cryptographically signed by an organizational identity. Therefore:</p>
+<ul>
+<li>hashes detect accidental/unauthorized byte change relative to the recorded manifest;</li>
+<li>they do not independently prove who originally created the pack.</li>
+</ul>
+<p>Signed release/attestation support is a roadmap item.</p>
+<h2>7. Integrity versus truth</h2>
+<p>A transcript can be byte-perfect and wrong.</p>
+<p>A source video can be byte-perfect and misleading.</p>
+<p>A manifest can be internally consistent and still describe material the user had no right to redistribute.</p>
+<p>Keep these trust questions separate:</p>
+<pre><code class="language-text">byte integrity ≠ authenticity ≠ semantic truth ≠ rights authority
+</code></pre>
+<h2>8. Temporary media handling</h2>
+<p>The build downloads a temporary source media carrier, creates normalized members, then removes the temporary carrier after successful processing.</p>
+<p>If the build terminates unexpectedly, inspect the output directory before sharing it. An incomplete run may leave working material that is not part of a valid closed pack.</p>
+<p><code>reasonpack verify</code> is the final authority for whether the directory satisfies the current package contract.</p>
+<h2>9. Pack sharing</h2>
+<p>Before sharing a pack:</p>
+<ol>
+<li>verify it;</li>
+<li>confirm source sharing/redistribution authority;</li>
+<li>inspect <code>source.json</code> for metadata you may not intend to distribute;</li>
+<li>consider whether full video/audio are necessary for the recipient;</li>
+<li>use an approved transfer/storage mechanism.</li>
+</ol>
+<p>ReasonPack does not automatically sanitize source metadata for external publication.</p>
+<h2>10. Enterprise rollout checklist</h2>
+<p>Validate:</p>
+<ul>
+<li>YouTube access policy;</li>
+<li>acceptable-use and copyright policy;</li>
+<li>endpoint storage and retention;</li>
+<li>proxy/TLS requirements;</li>
+<li>approved software sources;</li>
+<li>WSL policy;</li>
+<li>optional Whisper model approval;</li>
+<li>support ownership;</li>
+<li>update mechanism;</li>
+<li>data-loss-prevention treatment of generated packs.</li>
+</ul>
+<h2>11. Secure extension rule</h2>
+<p>Any future capability that introduces credentials, cloud writes, automatic sharing, private-source access or model execution should be treated as a <strong>new authority boundary</strong>, not a cosmetic feature addition.</p>
+</section><section id="developer-guide" data-title="developer guide"><div class="doc-kicker">DEVELOPER_GUIDE.md</div><h1>Developer Guide</h1>
+<h2>Read this before changing the core</h2>
+<p>The most important thing to preserve is not Bash syntax. It is the boundary between <strong>source evidence</strong>, <strong>derived reasoning</strong>, and <strong>downstream execution</strong>.</p>
+<h2>Code map</h2>
+<pre><code class="language-text">bin/reasonpack
+    current reference runtime / command router
+
+bin/yt
+bin/rp
+    thin convenience launchers
+
+install/
+    operator-owned dependency/bootstrap paths
+
+examples/sample-reasonpack/
+    synthetic verifier fixture
+
+tests/test-package.sh
+    package syntax/self-test/example qualification
+
+docs/
+    product/architecture/operating semantics
+</code></pre>
+<h2>Core commands</h2>
+<p>The implementation routes:</p>
+<ul>
+<li><code>doctor</code></li>
+<li><code>inspect</code></li>
+<li><code>build</code></li>
+<li><code>verify</code></li>
+<li><code>self-test</code></li>
+<li>URL as quick build</li>
+</ul>
+<p>Keep command failure explicit. Do not catch errors merely to return zero with a friendly message.</p>
+<h2>Development invariants</h2>
+<h3>Invariant 1 — source boundary stays explicit</h3>
+<p>Do not expand the allowlist without product/security/rights review and tests.</p>
+<h3>Invariant 2 — successful pack requires transcript evidence</h3>
+<p>Do not make <code>transcript.txt</code> optional merely to improve completion rates.</p>
+<h3>Invariant 3 — verification fails closed</h3>
+<p>Do not auto-regenerate checksums when verification detects changed bytes.</p>
+<h3>Invariant 4 — canonical pack stays source-evidence oriented</h3>
+<p>New AI-generated summaries/topics belong in a derived layer unless the package schema is explicitly versioned and the semantic contract changes.</p>
+<h3>Invariant 5 — credentials stay outside</h3>
+<p>Do not add browser-cookie/private-account convenience to the existing core without a new authority design.</p>
+<h3>Invariant 6 — no downstream provider requirement</h3>
+<p>The pack should remain useful without Codex/Claude/Copilot/SharePlane.</p>
+<h2>Test before change</h2>
+<p>Baseline:</p>
+<pre><code class="language-bash">bash -n bin/reasonpack install/*.sh
+./bin/reasonpack self-test
+./bin/reasonpack verify examples/sample-reasonpack
+./tests/test-package.sh
+</code></pre>
+<p>For changes to acquisition/normalization/transcription, add a real authorized qualification source in an appropriate test environment. Do not put copyrighted test media into the reference package merely for convenience.</p>
+<h2>Adding a new source provider</h2>
+<p>Do not simply loosen <code>validate_url</code>.</p>
+<p>A source adapter should define:</p>
+<ul>
+<li>admitted host(s);</li>
+<li>metadata contract;</li>
+<li>single-source vs batch semantics;</li>
+<li>media acquisition behavior;</li>
+<li>caption/subtitle behavior;</li>
+<li>credential posture;</li>
+<li>rights/terms considerations;</li>
+<li>failure cases;</li>
+<li>qualification tests.</li>
+</ul>
+<p>Then decide whether the schema should still be named <code>ghostmesh-reasoning-pack-v1</code> or needs a source-neutral successor.</p>
+<h2>Adding derived summaries/topics</h2>
+<p>Recommended architecture:</p>
+<pre><code class="language-text">verified ReasonPack
+      ↓ exact input hashes
+Derived Context Artifact
+      ├── summary.md
+      ├── topics.json
+      ├── citations.json
+      └── derivation-receipt.json
+</code></pre>
+<p>Do not inject the derived files into the existing verified pack and then silently update checksums. That destroys the source/interpretation boundary.</p>
+<h2>Adding storage</h2>
+<p>A storage adapter should:</p>
+<ol>
+<li>verify locally before upload;</li>
+<li>copy exact bytes;</li>
+<li>record storage locator separately from pack identity;</li>
+<li>verify remote size/hash by full readback when the storage API permits;</li>
+<li>never infer sharing rights;</li>
+<li>avoid making a provider URL the semantic artifact identity.</li>
+</ol>
+<h2>Adding Execution Packet support</h2>
+<p>See <code>EXECUTION_PACKET_BRIDGE.md</code>.</p>
+<p>The adapter should consume a verified ReasonPack as input evidence and add job semantics outside it.</p>
+<h2>Release checklist</h2>
+<ul>
+<li>update feature posture if behavior changed;</li>
+<li>update package contract if members/schema changed;</li>
+<li>update architecture/tradeoff docs for meaningful decisions;</li>
+<li>run local tests;</li>
+<li>qualify claimed OS paths;</li>
+<li>rebuild <code>MANIFEST.json</code> and <code>SHA256SUMS.txt</code>;</li>
+<li>confirm poster/marketing copy does not claim roadmap features as current;</li>
+<li>verify the complete distribution archive after creation.</li>
+</ul>
+<h2>Code style philosophy</h2>
+<p>The current runtime is deliberately small and dependency-light. Prefer:</p>
+<ul>
+<li>explicit shell/Python standard-library logic;</li>
+<li>readable failure boundaries;</li>
+<li>adapter calls to mature tools;</li>
+<li>few hidden state surfaces;</li>
+<li>no background daemon;</li>
+<li>no silent dependency installation at runtime.</li>
+</ul>
+<p>If the shell implementation becomes difficult to test safely, that is a signal to consider a more structured implementation language rather than adding increasingly clever Bash.</p>
+</section><section id="execution-packet-bridge" data-title="execution packet bridge"><div class="doc-kicker">EXECUTION_PACKET_BRIDGE.md</div><h1>ReasonPack and Execution Packets</h1>
+<h2>The short distinction</h2>
+<p><strong>ReasonPack preserves context. Execution Packet governs a particular job.</strong></p>
+<p>They are complementary, not competing formats.</p>
+<h2>ReasonPack asks</h2>
+<blockquote>
+<p>What source-derived material should survive this session?</p>
+</blockquote>
+<p>It packages:</p>
+<ul>
+<li>source metadata;</li>
+<li>normalized media/audio;</li>
+<li>transcript + provenance;</li>
+<li>technical metadata;</li>
+<li>byte identities.</li>
+</ul>
+<p>A ReasonPack is useful even if nobody ever executes an agent against it.</p>
+<h2>Execution Packet asks</h2>
+<blockquote>
+<p>What exact work should be performed, against which exact inputs, under what authority, and what evidence counts as completion?</p>
+</blockquote>
+<p>A governed Execution Packet can add:</p>
+<ul>
+<li>objective/intent;</li>
+<li>exact input references;</li>
+<li>accepted starting state;</li>
+<li>allowed/prohibited actions;</li>
+<li>required capabilities;</li>
+<li>execution policy;</li>
+<li>acceptance criteria;</li>
+<li>stop/recovery conditions;</li>
+<li>receipt contract.</li>
+</ul>
+<h2>Composition model</h2>
+<pre><code class="language-text">YouTube source
+    ↓
+ReasonPack build + verify
+    ↓
+verified source/context artifact
+    ↓
+Execution Packet references exact pack/member identities
+    ↓
+capable executor selected at runtime
+    ↓
+Execution Receipt
+</code></pre>
+<h2>Example</h2>
+<p>A ReasonPack alone might represent:</p>
+<blockquote>
+<p>“Here are the exact media/transcript/metadata bytes for this architecture talk.”</p>
+</blockquote>
+<p>An Execution Packet could then represent:</p>
+<blockquote>
+<p>“Using this exact transcript and source metadata, compare the architecture claims to our supplied standards. You may read these inputs and write one local report. Do not access external systems. Evaluate these four acceptance criteria and write the required execution receipt.”</p>
+</blockquote>
+<p>The first is durable context. The second is governed work.</p>
+<h2>Why not put the job inside ReasonPack?</h2>
+<p>Because source evidence and work authority have different lifecycles.</p>
+<p>One ReasonPack may support:</p>
+<ul>
+<li>a summary;</li>
+<li>an architecture review;</li>
+<li>a training handout;</li>
+<li>a counterargument analysis;</li>
+<li>a later research update.</li>
+</ul>
+<p>Those are different jobs against the same source artifact.</p>
+<p>If the job definition is embedded as the ReasonPack’s identity, every new use case forces unnecessary repackaging of the source evidence.</p>
+<h2>Why not put the media inside every Execution Packet?</h2>
+<p>You can carry bytes when appropriate, but the packet should be able to reference exact immutable inputs rather than duplicating large context artifacts for every job.</p>
+<p>This is the same separation that keeps reusable Skills from becoming one-off work manifests.</p>
+<h2>Current reference-kit boundary</h2>
+<p>The ReasonPack runtime in this kit does <strong>not</strong> automatically create Execution Packets.</p>
+<p>The bridge is architectural guidance and a roadmap direction.</p>
+<p>That means the following are not current commands:</p>
+<pre><code class="language-text">reasonpack execute ...
+reasonpack packetize ...
+reasonpack run-with-codex ...
+</code></pre>
+<p>If such capabilities are added, they should be explicit adapters with their own tests and receipts.</p>
+<h2>Future adapter requirements</h2>
+<p>A credible ReasonPack → Execution Packet adapter should:</p>
+<ol>
+<li>require a successfully verified pack;</li>
+<li>reference exact member SHA-256 identities;</li>
+<li>keep storage/carrier location separate from semantic input identity;</li>
+<li>avoid embedding credentials;</li>
+<li>make provider/executor selection late-bound unless mission semantics require one;</li>
+<li>require acceptance/stop/receipt semantics from the user/workflow;</li>
+<li>never mutate the original ReasonPack merely to make execution convenient.</li>
+</ol>
+<h2>Strategic value</h2>
+<p>This bridge demonstrates a larger pattern:</p>
+<pre><code class="language-text">reusable context + explicit work contract + replaceable executor + receipt
+</code></pre>
+<p>The interesting architecture is not that one script can call one model. It is that the context and the job can remain durable while the worker changes.</p>
+</section><section id="roadmap" data-title="roadmap"><div class="doc-kicker">ROADMAP.md</div><h1>Roadmap</h1>
+<p>The roadmap is organized around <strong>earned complexity</strong>. A feature enters only when it solves a demonstrated user or governance problem without collapsing ReasonPack into a monolith.</p>
+<h2>R0 — current reference capability</h2>
+<p>Status: implemented in this kit.</p>
+<ul>
+<li>single YouTube URL admission;</li>
+<li>metadata/source acquisition;</li>
+<li>normalized MP4 + audio;</li>
+<li>captions-first transcript;</li>
+<li>optional local Whisper fallback;</li>
+<li>transcript provenance status;</li>
+<li>ffprobe technical metadata;</li>
+<li>member byte/hash manifest;</li>
+<li>independent checksum file;</li>
+<li>closed-pack verification;</li>
+<li>doctor / inspect / build / verify / self-test;</li>
+<li>convenience <code>yt URL</code> flow;</li>
+<li>macOS/Linux/Windows-WSL bootstrap;</li>
+<li>no telemetry, automatic upload, private credential import, or AI execution.</li>
+</ul>
+<h2>R1 — release engineering and operational maturity</h2>
+<p>Goal: make distribution safer for a small team before adding shiny derived features.</p>
+<p>Candidate work:</p>
+<ul>
+<li>automated CI fixture suite across claimed OS/runtime variants;</li>
+<li>explicit semantic versioning and compatibility policy;</li>
+<li>updater/uninstaller lifecycle;</li>
+<li>richer machine-readable doctor/diagnostic receipt;</li>
+<li>dependency compatibility matrix;</li>
+<li>signed release artifacts/checksums;</li>
+<li>enterprise proxy/custom CA guidance;</li>
+<li>clearer partial-build cleanup/recovery behavior;</li>
+<li>installer idempotency tests.</li>
+</ul>
+<p>Exit condition: another team can install/update/remove the utility using maintained release artifacts without author intervention.</p>
+<h2>R2 — derived context layer</h2>
+<p>Goal: make packs faster to reason over without contaminating source evidence.</p>
+<p>Candidates:</p>
+<ul>
+<li>source-grounded summary;</li>
+<li>topics/concepts;</li>
+<li>chapter/timestamp index;</li>
+<li>keyframe selection;</li>
+<li>named-entity extraction;</li>
+<li>compact agent-context representation.</li>
+</ul>
+<p>Hard requirement: derived outputs must record the exact ReasonPack/member identities they used and must not silently enter the canonical source pack.</p>
+<p>Exit condition: derived artifacts can be regenerated/reviewed independently while the source-evidence layer remains unchanged.</p>
+<h2>R3 — team portability and signed identity</h2>
+<p>Candidates:</p>
+<ul>
+<li>signed release manifest;</li>
+<li>exact copy/readback helper for approved storage systems;</li>
+<li>pack registry/search adapter;</li>
+<li>retention/version conventions;</li>
+<li>team-readable provenance summaries.</li>
+</ul>
+<p>Hard requirement: storage location must not become semantic artifact identity.</p>
+<h2>R4 — Execution Packet adapter</h2>
+<p>Goal: turn a verified context artifact into optional governed work without coupling ReasonPack to one executor.</p>
+<p>Candidates:</p>
+<ul>
+<li>select exact pack/member inputs;</li>
+<li>generate a packet skeleton;</li>
+<li>collect objective/authority/acceptance/stop semantics;</li>
+<li>execute through compatible adapters;</li>
+<li>normalize execution receipts.</li>
+</ul>
+<p>Hard requirement: credentials remain external and ReasonPack source bytes remain unchanged.</p>
+<h2>R5 — native Windows, if earned</h2>
+<p>Native Windows support should be added only when real adoption justifies maintaining a second runtime path.</p>
+<p>Options should be evaluated rather than assumed:</p>
+<ul>
+<li>native Python implementation;</li>
+<li>PowerShell wrapper around native tools;</li>
+<li>packaged runtime;</li>
+<li>continued WSL as sufficient enterprise path.</li>
+</ul>
+<h2>Explicitly deferred temptations</h2>
+<p>Do not build these merely because they look adjacent on an architecture diagram:</p>
+<ul>
+<li>bespoke cloud sync;</li>
+<li>proprietary model API gateway;</li>
+<li>knowledge graph built into ReasonPack;</li>
+<li>custom browser login/cookie capture;</li>
+<li>background monitoring daemon;</li>
+<li>social/publication layer.</li>
+</ul>
+<p>Each may be a valid separate product. None is required to prove ReasonPack’s core value.</p>
+</section><section id="handoff-philosophy" data-title="handoff philosophy"><div class="doc-kicker">DESIGN_AND_HANDOFF_PHILOSOPHY.md</div><h1>Design and Handoff Philosophy</h1>
+<h2>The package is part of the product</h2>
+<p>Internal tooling often dies in the gap between “works on my machine” and “another capable person can use it without me.”</p>
+<p>This kit treats handoff quality as an engineering property.</p>
+<p>The goal is not exhaustive documentation. It is <strong>minimum sufficient durable context</strong>.</p>
+<h2>What information deserves to survive</h2>
+<p>Preserve information when losing it would force the next person to re-reason a meaningful decision:</p>
+<ul>
+<li>why the product exists;</li>
+<li>what it does today;</li>
+<li>what it intentionally does not do;</li>
+<li>architecture and trust boundaries;</li>
+<li>package/interface contracts;</li>
+<li>dependencies and install mutations;</li>
+<li>expected failure semantics;</li>
+<li>acceptance criteria;</li>
+<li>security/rights constraints;</li>
+<li>success measures;</li>
+<li>key tradeoffs;</li>
+<li>extension boundaries.</li>
+</ul>
+<p>Do not document every shell statement twice. Source code already preserves implementation detail.</p>
+<h2>Different documents have different reader jobs</h2>
+<p>A good package supports multiple depths:</p>
+<h3>Five-minute evaluator</h3>
+<p>Needs product tour, feature posture, value proposition and architecture map.</p>
+<h3>New user</h3>
+<p>Needs installation, doctor/self-test, normal commands and troubleshooting.</p>
+<h3>Operator/support owner</h3>
+<p>Needs dependency/support matrix, failure classes, update/removal model and security boundaries.</p>
+<h3>Developer</h3>
+<p>Needs architecture, package contract, design decisions, tests and extension rules.</p>
+<h3>Product/engineering manager</h3>
+<p>Needs PRD, vision, roadmap, success metrics, risks and what-good-looks-like.</p>
+<p>Trying to make one README serve all five readers usually produces either a wall of text or a useless brochure.</p>
+<h2>Documentation quality test</h2>
+<p>A document is useful when it changes what the recipient can correctly decide or do.</p>
+<p>Good documentation contains semantics such as:</p>
+<ul>
+<li><strong>because</strong> — rationale;</li>
+<li><strong>must / must not</strong> — invariant;</li>
+<li><strong>means</strong> — interpretation;</li>
+<li><strong>if / then</strong> — operating behavior;</li>
+<li><strong>current / next</strong> — lifecycle posture;</li>
+<li><strong>evidence</strong> — how a claim is checked.</li>
+</ul>
+<p>A page with only headings and bullets may look organized while preserving almost no reasoning.</p>
+<h2>Precision over ceremony</h2>
+<p>Professional does not mean bureaucratic.</p>
+<p>We do not need:</p>
+<ul>
+<li>a 50-page template because the governance office has one;</li>
+<li>duplicate requirement prose in six places;</li>
+<li>fake KPI history;</li>
+<li>diagrams that introduce concepts the code does not implement.</li>
+</ul>
+<p>We do need the recipient to understand the system accurately.</p>
+<h2>Handoff acceptance question</h2>
+<p>The final test is simple:</p>
+<blockquote>
+<p>If the original author disappears for a month, can another strong engineer operate and evolve the product without inventing its intent?</p>
+</blockquote>
+<p>If not, more of the important context needs to become durable.</p>
+</section><section id="documentation-map" data-title="documentation map"><div class="doc-kicker">DOCUMENTATION_MAP.md</div><h1>Documentation Map</h1>
+<table>
+<thead>
+<tr>
+  <th>Document</th>
+  <th>Primary reader</th>
+  <th>Question it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>PRODUCT_FEATURE_SET.md</code></td>
+  <td>everyone</td>
+  <td>What does it actually do today?</td>
+</tr>
+<tr>
+  <td><code>FEATURE_CURRENT_NEXT_NOT_YET.md</code></td>
+  <td>evaluator</td>
+  <td>Give me the one-screen feature posture.</td>
+</tr>
+<tr>
+  <td><code>PRD.md</code></td>
+  <td>product/engineering lead</td>
+  <td>What problem, requirements and acceptance define the product?</td>
+</tr>
+<tr>
+  <td><code>VISION_STRATEGY.md</code></td>
+  <td>leader/architect</td>
+  <td>Why does this matter beyond a downloader?</td>
+</tr>
+<tr>
+  <td><code>ARCHITECTURE.md</code></td>
+  <td>engineer/architect</td>
+  <td>How are acquisition, transform, transcript and evidence separated?</td>
+</tr>
+<tr>
+  <td><code>PACKAGE_CONTRACT.md</code></td>
+  <td>engineer/operator</td>
+  <td>What exact files/semantics make a valid pack?</td>
+</tr>
+<tr>
+  <td><code>DECISIONS_AND_TRADEOFFS.md</code></td>
+  <td>maintainer</td>
+  <td>Why were the non-obvious design choices made?</td>
+</tr>
+<tr>
+  <td><code>WHAT_GOOD_LOOKS_LIKE.md</code></td>
+  <td>reviewer/lead</td>
+  <td>What quality bar should we enforce?</td>
+</tr>
+<tr>
+  <td><code>SUCCESS_METRICS.md</code></td>
+  <td>product/engineering lead</td>
+  <td>How would we know the product is reliable and adopted?</td>
+</tr>
+<tr>
+  <td><code>DEPENDENCIES.md</code></td>
+  <td>engineer/operator</td>
+  <td>What does it depend on and why?</td>
+</tr>
+<tr>
+  <td><code>SUPPORT_MATRIX.md</code></td>
+  <td>operator/support</td>
+  <td>Which OS/runtime paths are actually claimed?</td>
+</tr>
+<tr>
+  <td><code>INSTALLATION.md</code></td>
+  <td>new user/operator</td>
+  <td>What will installation change and how do I install/remove it?</td>
+</tr>
+<tr>
+  <td><code>USER_GUIDE.md</code></td>
+  <td>user</td>
+  <td>How do I use it correctly?</td>
+</tr>
+<tr>
+  <td><code>OPERATING_MODEL.md</code></td>
+  <td>operator/maintainer</td>
+  <td>What is the lifecycle and support/triage model?</td>
+</tr>
+<tr>
+  <td><code>TROUBLESHOOTING.md</code></td>
+  <td>user/support</td>
+  <td>What do common failures mean?</td>
+</tr>
+<tr>
+  <td><code>SECURITY_RIGHTS.md</code></td>
+  <td>reviewer/operator</td>
+  <td>What are the security, privacy and rights boundaries?</td>
+</tr>
+<tr>
+  <td><code>DEVELOPER_GUIDE.md</code></td>
+  <td>maintainer</td>
+  <td>How do I extend it without breaking the product semantics?</td>
+</tr>
+<tr>
+  <td><code>EXECUTION_PACKET_BRIDGE.md</code></td>
+  <td>architect</td>
+  <td>How does this connect to governed downstream work?</td>
+</tr>
+<tr>
+  <td><code>ROADMAP.md</code></td>
+  <td>product/engineering lead</td>
+  <td>What comes next, and under what constraints?</td>
+</tr>
+<tr>
+  <td><code>DESIGN_AND_HANDOFF_PHILOSOPHY.md</code></td>
+  <td>team lead</td>
+  <td>Why is the package documented this way?</td>
+</tr>
+<tr>
+  <td><code>REQUIREMENTS_TRACEABILITY.md</code></td>
+  <td>developer/reviewer</td>
+  <td>Which requirements map to code/tests and where are the evidence gaps?</td>
+</tr>
+</tbody>
+</table>
+<p>Start at <code>../00_START_HERE.md</code> if you are unsure.</p>
+</section></main></div><script>
+const q=document.getElementById('q');q.addEventListener('input',()=>{const v=q.value.trim().toLowerCase();document.querySelectorAll('.side a').forEach(a=>a.style.display=!v||a.dataset.title.includes(v)?'block':'none');document.querySelectorAll('.content section').forEach(s=>s.style.display=!v||s.dataset.title.includes(v)||s.innerText.toLowerCase().includes(v)?'block':'none')});
+</script></body></html>

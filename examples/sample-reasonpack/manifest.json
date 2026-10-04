@@ -1,0 +1,38 @@
+{
+  "schema": "ghostmesh-reasoning-pack-v1",
+  "sourceUrl": "https://www.youtube.com/watch?v=fixture",
+  "tools": {},
+  "members": [
+    {
+      "path": "video.mp4",
+      "bytes": 39,
+      "sha256": "1cc78c0334f4d6b6ecb24f14b0d2686ae35f1b8dca80a17d8344fda21625f771"
+    },
+    {
+      "path": "audio.m4a",
+      "bytes": 39,
+      "sha256": "84dd08387c958fe93f95c59b717eee3b2de336e7deb225d6f133a6a2ec7190a3"
+    },
+    {
+      "path": "transcript.txt",
+      "bytes": 86,
+      "sha256": "adb64f095b6e1c5509932745d5e48a419ca8c1be56b365e97cde62910b2f6728"
+    },
+    {
+      "path": "transcript-status.json",
+      "bytes": 36,
+      "sha256": "9b765283efcbb6917522fa42cc3a127e2c9140d75e3c2004a7065761f9ae6a56"
+    },
+    {
+      "path": "source.json",
+      "bytes": 125,
+      "sha256": "775b542717f715e1668e472baf9eed8a8b2f749c9a98f2cc9e390a394de02a7b"
+    },
+    {
+      "path": "ffprobe.json",
+      "bytes": 60,
+      "sha256": "4ac92467867c27a24059500bb18b9b9e41013fc62c1477423b0a92199d39e9e3"
+    }
+  ],
+  "fixture": true
+}

@@ -1,103 +1,76 @@
-# ReasonPack
+# ReasonPack Professional Reference Kit
 
-ReasonPack turns one authorized YouTube source into a **verifiable local research pack** for humans and AI systems.
+**Capture once. Carry forward. Verify what you have.**
 
-It combines `yt-dlp`, `ffmpeg`, `ffprobe`, source captions, optional local Whisper transcription, manifests, and SHA-256 verification into one small CLI. The result is not just a download. It is a closed evidence package whose media, transcript, metadata, and hashes can be inspected and reproduced.
+ReasonPack is a small local CLI for converting one authorized YouTube source into a portable evidence package containing normalized media, audio, transcript material, source metadata, technical metadata, a member manifest, and SHA-256 integrity records.
 
-## Output
+The utility is deliberately boring in the places where boring is valuable. Source acquisition is explicit. Transcript provenance is explicit. Missing dependencies fail visibly. Missing captions do not become an imaginary transcript. Files are hashed. Verification rejects drift and unexplained files. Nothing is silently uploaded to a cloud service or handed to an AI provider.
 
-```text
-pack/
-  video.mp4
-  audio.m4a
-  transcript.txt
-  transcript-status.json
-  source.json
-  ffprobe.json
-  captions.vtt              # when source captions exist
-  manifest.json
-  SHA256SUMS.txt
-```
-
-`verify` rejects missing files, empty required evidence, hash mismatches, and untracked regular files.
-
-## Why
-
-Downloading a video is easy. Preserving enough provenance to reason about it later without confusing a generated transcript for source truth is the useful part.
-
-ReasonPack is built for research workflows where the same source may be reviewed by people, local tools, coding agents, or frontier models. Media remains primary evidence. Transcripts are searchable projections.
-
-## Commands
+## Quick start
 
 ```bash
-reasonpack version
+# macOS
+./install/install-macos.sh
+
+# Linux
+./install/install-linux.sh
+
+# Windows PowerShell, using WSL as the supported runtime
+.\install\install-windows-wsl.ps1
+```
+
+Then:
+
+```bash
 reasonpack doctor
-reasonpack inspect 'https://www.youtube.com/watch?v=VIDEO_ID'
-reasonpack build 'https://www.youtube.com/watch?v=VIDEO_ID' ./pack
-reasonpack verify ./pack
 reasonpack self-test
+yt "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-The CLI intentionally accepts canonical YouTube hosts only: `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `youtu.be`.
+`yt` and `rp` are convenience aliases for the same ReasonPack executable.
 
-## Dependencies
+## What a successful pack contains
 
-Required: `yt-dlp`, `ffmpeg`, `ffprobe`, `python3`, and `shasum`.
+Required members:
 
-Optional local transcription fallback: `whisper-cli` from whisper.cpp plus a local GGML Whisper model. Explicit `WHISPER_CLI` and `WHISPER_MODEL` environment variables always win. If unset, ReasonPack looks for `whisper-cli` on `PATH` and then checks:
+- `video.mp4` — normalized H.264/AAC analysis copy.
+- `audio.m4a` — extracted AAC audio.
+- `transcript.txt` — transcript text from source captions or configured local Whisper fallback.
+- `transcript-status.json` — provenance/status for transcript creation.
+- `source.json` — source metadata captured by `yt-dlp`.
+- `ffprobe.json` — normalized media stream/container metadata.
+- `manifest.json` — tracked member names, sizes and SHA-256 identities plus tool versions.
+- `SHA256SUMS.txt` — independent checksum inventory.
 
-```text
-~/.local/share/reasonpack/whisper/ggml-small.en.bin
-~/.local/share/ghostmesh/whisper/ggml-small.en.bin
-```
+Optional member:
 
-No cloud transcription provider is called by ReasonPack.
+- `captions.vtt` — preserved source caption file when source captions were used.
 
-## Install
+The pack is **closed under its manifest**. `reasonpack verify` rejects missing files, empty required files, digest or byte-count drift, and unexplained regular files added to the canonical pack directory.
 
-```bash
-git clone https://github.com/pinklon/reasonpack.git
-cd reasonpack
-./install.sh
-reasonpack doctor
-```
+## What it does not do today
 
-The installer copies the CLI into `~/.local/bin` by default. It does not silently install dependencies.
+The current runtime does not automatically summarize, extract topics, generate keyframes, create embeddings, upload to Drive, sync to a team repository, or invoke Codex/Claude/Copilot. Those capabilities may be valuable, but they are deliberately separated from the current evidence-building core.
 
-Override the prefix with `PREFIX=/usr/local ./install.sh`.
+See `docs/PRODUCT_FEATURE_SET.md` for the authoritative CURRENT / NEXT / NOT YET contract.
 
-On macOS, a typical dependency install is:
+## Why the package is larger than the script
 
-```bash
-brew install yt-dlp ffmpeg whisper-cpp
-```
+The tool itself is small. The engineering context around it should not be mysterious.
 
-A Whisper model is separate. Set `WHISPER_MODEL` to the local model you intend to use.
+This kit includes:
 
-## Verification model
+- product feature contract;
+- architecture and package contracts;
+- PRD and strategic vision;
+- quality bar and success measures;
+- operating model and dependency map;
+- macOS, Linux and Windows/WSL onboarding paths;
+- user and developer guides;
+- troubleshooting and security/rights guidance;
+- design decisions and tradeoffs;
+- roadmap;
+- optional bridge to Execution Packets;
+- diagrams, synthetic example, checksums and manifest.
 
-1. `yt-dlp` acquires source media and metadata.
-2. `ffmpeg` normalizes video and audio.
-3. Source captions are preferred when available.
-4. Local Whisper may be used only as a local fallback.
-5. Every retained evidence member is hashed into the manifest.
-6. `SHA256SUMS.txt` independently closes the package.
-7. `reasonpack verify` checks integrity and membership closure.
-
-Speech recognition remains inference. Hashing and package closure do not.
-
-## Scope
-
-ReasonPack does not bypass DRM, authentication, access controls, paywalls, or platform restrictions. Use it only for material you own or are authorized or legally permitted to download and analyze. You are responsible for applicable law and platform terms.
-
-ReasonPack does not upload, publish, redistribute, or call reasoning models on its own.
-
-## Status
-
-`v1.0.1` is the first standalone public release, extracted from a production research workflow and hardened around deterministic provenance and local verification.
-
-See [ROADMAP.md](ROADMAP.md).
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE).
+The intended lesson is not “write more documents.” It is **preserve the decisions that another capable person would otherwise have to rediscover**.

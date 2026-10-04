@@ -8,13 +8,15 @@ permissions:
   contents: read
 
 jobs:
-  contract:
+  reference-kit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Shell syntax
-        run: bash -n bin/reasonpack
+        run: bash -n bin/reasonpack install/*.sh tests/test-package.sh
       - name: Offline self-test
-        run: bin/reasonpack self-test
-      - name: Contract checks
-        run: python3 tests/test_contract.py
+        run: ./bin/reasonpack self-test
+      - name: Verify synthetic pack
+        run: ./bin/reasonpack verify examples/sample-reasonpack
+      - name: Reference-kit package tests
+        run: ./tests/test-package.sh
