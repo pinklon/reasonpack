@@ -7,10 +7,13 @@ exact source evidence and pinned public SharePlane Work references.
 """
 from __future__ import annotations
 import argparse
+from hashlib import sha256 as _sha256
 from hashlib import sha256
 import importlib.util
 import json
 import os
+import tempfile
+import shutil
 from pathlib import Path
 import re
 import sys
@@ -113,15 +116,77 @@ def prepare(args):
     prompt_raw=prompt(packet,registry,identity).encode("utf-8")
     if len(prompt_raw)>180_000:
         refuse("composed reasoning prompt exceeds 180 KB; segment source context")
-    args.out.mkdir(parents=True,mode=0o700)
-    safe_write(args.out/"analysis-schema.json",schema_raw)
-    safe_write(args.out/"model-prompt.json",prompt_raw)
-    receipt={"schema":SCHEMA,"status":"model-input-ready-not-invoked","source_video_id":identity["video_id"],
-             "research_packet_sha256":identity["packet_sha256"],
-             "evidence_registry_sha256":identity["registry_sha256"],
-             "model_prompt_sha256":digest(prompt_raw),"model_schema_sha256":digest(schema_raw),
-             "provider_invoked":False,"owner_approved":False,"public_release":False}
-    safe_write(args.out/"composition-receipt.json",(json.dumps(receipt,indent=2)+"\n").encode())
+    args.out.parent.mkdir(parents=True,exist_ok=True)
+    staging=Path(tempfile.mkdtemp(prefix=".reasonpack-compose-",dir=args.out.parent))
+    try:
+        safe_write(staging/"analysis-schema.json",schema_raw)
+        safe_write(staging/"model-prompt.json",prompt_raw)
+        segment_prompt_digests=[]
+        if packet.get("transcript_mode")=="segmented":
+            if not args.segments or args.segments.is_symlink():
+                refuse("segmented transcript requires explicit verified segment custody")
+            segment_manifest_raw=(args.segments/"segments-manifest.json").read_bytes()
+            segindex=json.loads(segment_manifest_raw)
+            if (digest(segment_manifest_raw)!=packet.get("segments_manifest_sha256")
+                    or segindex.get("schema")!="ghostmesh.reasonpack.segments.v1"
+                    or segindex.get("transcript_sha256")!=packet["transcript_sha256"]
+                    or segindex.get("segment_count")!=packet["segment_count"]
+                    or segindex.get("source_manifest_sha256")!=packet["source_manifest_sha256"]):
+                refuse("segment manifest or source identity mismatch")
+            segmentdir=args.segments/"segments"
+            if not segmentdir.is_dir() or segmentdir.is_symlink():
+                refuse("segment source directory unavailable")
+            if {p.name for p in segmentdir.iterdir()}!={e["path"] for e in segindex["segments"]}:
+                refuse("untracked or missing transcript segment")
+            promptdir=staging/"segment-prompts"
+            promptdir.mkdir(mode=0o700)
+            h=_sha256()
+            expected_offset=0
+            for i,entry in enumerate(segindex["segments"]):
+                if (entry.get("index")!=i or entry.get("path")!=f"segment-{i:06d}.txt"
+                        or entry.get("start_byte")!=expected_offset):
+                    refuse("unordered transcript segment")
+                segment_path=segmentdir/entry["path"]
+                if segment_path.is_symlink():
+                    refuse("symlinked source segment")
+                raw=segment_path.read_bytes()
+                if len(raw)!=entry.get("bytes") or digest(raw)!=entry.get("sha256"):
+                    refuse("segment data tampering")
+                h.update(raw)
+                expected_offset+=len(raw)
+                if entry.get("end_byte")!=expected_offset:
+                    refuse("missing source bytes between segments")
+                chunk=raw.decode("utf-8")
+                chunk_input=json.loads(prompt_raw)
+                chunk_input["rules"].append("This is one of many ordered, non-overlapping transcript segments. Return observations bound to this segment only; no final whole-video verdict until all segments are independently processed and reconciled.")
+                chunk_input["bounded_evidence"]["untrusted_video_transcript"]=chunk
+                chunk_input["bounded_evidence"]["segment_identity"]={"index":i,"sha256":entry["sha256"],
+                             "source_start_byte":entry["start_byte"],"source_end_byte":entry["end_byte"],
+                             "total_segments":packet["segment_count"]}
+                encoded=(json.dumps(chunk_input,ensure_ascii=False,indent=2)+"\n").encode("utf-8")
+                if len(encoded)>180_000:
+                    refuse("single segment prompt exceeds per-invocation budget")
+                name=f"segment-{i:06d}.json"
+                safe_write(promptdir/name,encoded)
+                segment_prompt_digests.append({"index":i,"segment_sha256":entry["sha256"],
+                                                "prompt_sha256":digest(encoded),"path":name})
+            if h.hexdigest()!=packet["transcript_sha256"] or expected_offset!=segindex["transcript_bytes"]:
+                refuse("segment coverage does not reconstruct source transcript")
+        receipt={"schema":SCHEMA,"status":"model-input-ready-not-invoked","source_video_id":identity["video_id"],
+                 "research_packet_sha256":identity["packet_sha256"],
+                 "evidence_registry_sha256":identity["registry_sha256"],
+                 "model_prompt_sha256":digest(prompt_raw),"model_schema_sha256":digest(schema_raw),
+                 "provider_invoked":False,"owner_approved":False,"public_release":False,
+                 "transcript_mode":packet.get("transcript_mode","inline"),
+                 "segment_prompt_receipts":segment_prompt_digests,
+                 "segment_results_validated":False}
+        safe_write(staging/"composition-receipt.json",(json.dumps(receipt,indent=2)+"\n").encode())
+        if args.out.exists():
+            refuse("composition destination appeared during preparation")
+        os.rename(staging,args.out)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
     return {"status":receipt["status"],"video_id":identity["video_id"],
             "input_sha256":digest(prompt_raw),"output_dir":str(args.out)}
 
@@ -132,6 +197,11 @@ def validate(args):
     reader.load_analysis(args.candidate)
     if candidate.get("video_id")!=identity["video_id"]:
         refuse("model output refers to the wrong video")
+    if packet.get("transcript_mode")=="segmented":
+        # Whole-video conclusions must not be qualified from the initial
+        # map prompts alone. A separate all-segment reconciliation gate
+        # is required; this branch does not silently attest it.
+        refuse("segmented source needs all-segment synthesis receipt before final validation")
     ev=mod("research-evidence")
     support=ev.assert_supported_claims(candidate,registry)
     approved={(w["title"],w["url"],w["source_commit"])
@@ -160,6 +230,7 @@ def main():
         s=subs.add_parser(cmd);s.add_argument("--packet",type=Path,required=True)
         s.add_argument("--registry",type=Path,required=True)
         s.add_argument("--out",type=Path,required=True)
+        if cmd=="prepare":s.add_argument("--segments",type=Path)
         if cmd=="validate":s.add_argument("--candidate",type=Path,required=True)
     args=p.parse_args()
     try:

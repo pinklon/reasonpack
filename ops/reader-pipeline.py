@@ -172,6 +172,15 @@ def prepare_research(args):
         pack, ref = verify_source_unchanged(args.job)
         cmd = [sys.executable, str(ROOT / "ops/editorial-packet.py"),
                "--pack", str(pack), "--out", str(args.job / "research-input.json")]
+        if (pack/"transcript.txt").stat().st_size > 32_000:
+            segdir=args.job/"segments"
+            if segdir.exists():
+                execute([sys.executable,str(ROOT/"ops/longform-segments.py"),"verify",
+                         "--transcript",str(pack/"transcript.txt"),"--segments",str(segdir)])
+            else:
+                execute([sys.executable,str(ROOT/"ops/longform-segments.py"),"build",
+                         "--pack",str(pack),"--out",str(segdir)])
+            cmd += ["--segments",str(segdir)]
         for work in args.public_work:
             cmd += ["--work", str(work)]
         execute(cmd)
@@ -181,7 +190,10 @@ def prepare_research(args):
                 or packet.get("source_manifest_sha256") != ref["manifest_sha256"]):
             reject("research packet source custody mismatch")
         return advance(args.job, flow, "awaiting-research",
-                       {"research_packet_sha256": digest(packet_raw), "public_works": len(packet.get("public_owner_reviewed_thesis_context", []))})
+                       {"research_packet_sha256": digest(packet_raw),
+                        "transcript_mode":packet.get("transcript_mode"),
+                        "segment_count":packet.get("segment_count"),
+                        "public_works": len(packet.get("public_owner_reviewed_thesis_context", []))})
     finally:
         os.close(fd)
 
@@ -226,6 +238,8 @@ def prepare_model(args):
                  "--packet",str(args.job/"research-input.json"),
                  "--registry",str(args.job/"research-evidence.json"),
                  "--out",str(args.job/"composition")]
+        if (args.job/"segments").exists():
+            command += ["--segments",str(args.job/"segments")]
         execute(command)
         receipt=data(args.job/"composition"/"composition-receipt.json")
         if receipt.get("status")!="model-input-ready-not-invoked":
