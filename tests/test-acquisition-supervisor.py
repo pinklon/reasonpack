@@ -151,7 +151,7 @@ class DurableTests(unittest.TestCase):
         self.assertEqual(self.observe()["status"],"registered-no-worker")
         unpermitted=cli("launch-real","--job",self.job,
                         "--expected-cli-sha256",
-                        "75e9d940027405ebbeddd2861299c8216cdb48a00bed597475b4da3833a9aebb")
+                        "02200ef7af3c607f7b74f642a3d6d35637b431ca98a943344ffd044517b2bd78")
         self.assertEqual(unpermitted.returncode,2)
         self.assertEqual(self.observe()["status"],"registered-no-worker")
         self.assertFalse((self.job/"real-worker.stdout").exists())

@@ -1,8 +1,8 @@
 {
   "schemaVersion": "reasonpack-reference-kit.v1",
   "name": "ReasonPack Professional Reference Kit",
-  "version": "1.1-refkit.2",
-  "runtimeVersion": "1.0-refkit.2",
+  "version": "1.1-refkit.3",
+  "runtimeVersion": "1.0-refkit.3",
   "created": "2026-09-10",
   "posture": "reference-distribution-candidate",
   "purpose": "Working ReasonPack utility plus reference-quality engineering/product handoff.",
@@ -15,7 +15,7 @@
   },
   "referenceRuntime": {
     "path": "bin/reasonpack",
-    "sha256": "2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1",
+    "sha256": "02200ef7af3c607f7b74f642a3d6d35637b431ca98a943344ffd044517b2bd78",
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
@@ -44,8 +44,8 @@
     },
     {
       "path": "bin/reasonpack",
-      "bytes": 11829,
-      "sha256": "2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1"
+      "bytes": 12487,
+      "sha256": "02200ef7af3c607f7b74f642a3d6d35637b431ca98a943344ffd044517b2bd78"
     },
     {
       "path": "bin/rp",
@@ -101,6 +101,11 @@
       "path": "docs/DEVELOPER_GUIDE.md",
       "bytes": 4426,
       "sha256": "eca4ef2c03579d6282b34b4e4f3c68a585db9b5b59a14e9f71a9e8f7c694b1f1"
+    },
+    {
+      "path": "docs/DIRECT_REMUX_SOURCE_CAPTURE_V19.md",
+      "bytes": 3831,
+      "sha256": "a0deabe3e26834b53128fcfc35b5e4d34b1d637bb359d12abcf6815b9eeb0768"
     },
     {
       "path": "docs/DOCUMENTATION_MAP.md",
@@ -244,13 +249,13 @@
     },
     {
       "path": "install/install-linux.sh",
-      "bytes": 1483,
-      "sha256": "5861a27761e72ce1725d7d0f062585681469a0b9f56c2828f06cfa6e662e559b"
+      "bytes": 1635,
+      "sha256": "d114cc1b2109ca8b720ce9fc62e1efb0aa8cc479b296c6a00bee30c4f21501f9"
     },
     {
       "path": "install/install-macos.sh",
-      "bytes": 956,
-      "sha256": "86559addeedb3eb1fe6cc4397056fc98bb32cc4b6316e0e45967693bf968b5f9"
+      "bytes": 1108,
+      "sha256": "2a0e1c5b303268bece86a4d7ab1641bfb933e7813d1efa6f7800d36f1c7c2627"
     },
     {
       "path": "install/install-windows-wsl.ps1",
@@ -261,6 +266,11 @@
       "path": "install/install-wsl.sh",
       "bytes": 78,
       "sha256": "67ff5e1d75fc6b4f255da97ff17a7a09bc4a434631ea4001c7775dbf00448e40"
+    },
+    {
+      "path": "ops/direct-remux-pack.py",
+      "bytes": 9872,
+      "sha256": "6c877da6c857346213e5cb5d975b64aae67a1b066e14886f7f484a9dfd3672bf"
     },
     {
       "path": "presentation/reasonpack-vision-poster.png",

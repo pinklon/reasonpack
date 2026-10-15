@@ -175,7 +175,11 @@ def build(url,target,*,run=invoke,probe_media=probe):
              "caption_line_count":captions["source_line_count"],
              "last_caption_second":captions["last_caption_second"]})
         doc=manifest_and_inventory(stage,url,{**media,**captions})
-        run([str(ROOT/"bin/reasonpack"),"verify",str(stage)])
+        repo_cli=ROOT/"bin/reasonpack"
+        installed_cli=Path(__file__).resolve().parent/"reasonpack"
+        verifier=repo_cli if repo_cli.is_file() else installed_cli
+        if not verifier.is_file():hold("pinned canonical verifier not installed")
+        run([str(verifier),"verify",str(stage)])
         if target.exists() or target.is_symlink():hold("output appeared during capture")
         os.replace(stage,target)
         return {"status":"canonical-direct-remux-verified",

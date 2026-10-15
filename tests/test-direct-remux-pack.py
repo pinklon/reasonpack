@@ -105,6 +105,24 @@ class DirectPackTests(unittest.TestCase):
         self.assertIn(b"Another idea.",txt)
         with self.assertRaisesRegex(ValueError,"not WebVTT"):
             M.timed_vtt(b"not captions")
+    def test_installed_alias_can_find_pinned_helper_without_network(self):
+        import shutil
+        installed=self.tmp/"share/reasonpack"
+        scripts=self.tmp/"bin"
+        installed.mkdir(parents=True)
+        scripts.mkdir()
+        shutil.copyfile(ROOT/"bin/reasonpack",installed/"reasonpack")
+        shutil.copyfile(ROOT/"ops/direct-remux-pack.py",installed/"direct-remux-pack.py")
+        (installed/"reasonpack").chmod(0o755)
+        (scripts/"reasonpack").symlink_to(installed/"reasonpack")
+        result=subprocess.run([str(scripts/"reasonpack"),"build-fast",
+             "http://invalid.example/video",str(self.tmp/"should-not-create")],
+             capture_output=True,text=True,timeout=8)
+        self.assertEqual(result.returncode,2,result.stderr)
+        self.assertIn("canonical HTTPS YouTube URL",result.stderr)
+        self.assertNotIn("helper not installed",result.stderr)
+        self.assertFalse((self.tmp/"should-not-create").exists())
+
     def test_fast_builder_does_not_change_legacy_build(self):
         source=(ROOT/"bin/reasonpack").read_text()
         self.assertIn("build-fast)",source)
