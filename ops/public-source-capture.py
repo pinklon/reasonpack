@@ -129,6 +129,8 @@ def fetch(url,*,timeout=12, transport=None, resolve=None):
             fail("oversized declared source")
         raw=response.read(MAX_BODY+1)
         if len(raw)>MAX_BODY:fail("oversized downloaded source")
+        if declared is not None and len(raw)!=int(declared):
+            fail("incomplete HTTP response body; declared length differs from downloaded bytes")
         if not raw:fail("empty external source")
         return raw,mime,peer
     finally:

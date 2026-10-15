@@ -139,6 +139,11 @@ class CaptureTests(unittest.TestCase):
             Connection.responses=[response]
             with self.assertRaises(ValueError):
                 mod.fetch(SOURCE,transport=Connection,resolve=lambda _:"8.8.8.8")
+    def test_incomplete_declared_length_is_rejected(self):
+        Connection.responses=[Response(raw=b"Hugging Face",size=900)]
+        with self.assertRaisesRegex(ValueError,"incomplete HTTP response"):
+            mod.fetch(SOURCE,transport=Connection,resolve=lambda _:"8.8.8.8")
+
     def test_excerpt_must_occur_in_fetched_bytes(self):
         self.source["needle"]="The researcher personally inspected the internet"
         self.save_catalog()
