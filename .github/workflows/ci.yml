@@ -32,3 +32,4 @@ jobs:
           python3 tests/test-mission-receipt.py
           python3 tests/test-longform-synthesis.py
           python3 tests/test-acquisition-supervisor.py
+          python3 tests/test-acquisition-real-worker.py

@@ -142,6 +142,68 @@ class DurableTests(unittest.TestCase):
         self.assertFalse(stopped["automatic_restart_authorized"])
         self.assertFalse(stopped["synthetic_completion_reported"])
         self.assertEqual(self.launch().returncode,2)
+    def test_real_network_launch_requires_explicit_pin_and_operator_switch(self):
+        self.assertEqual(self.register().returncode,0)
+        wrong=cli("launch-real","--job",self.job,
+                   "--permit-network-acquisition",
+                   "--expected-cli-sha256","b"*64)
+        self.assertEqual(wrong.returncode,2)
+        self.assertEqual(self.observe()["status"],"registered-no-worker")
+        unpermitted=cli("launch-real","--job",self.job,
+                        "--expected-cli-sha256",
+                        "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef")
+        self.assertEqual(unpermitted.returncode,2)
+        self.assertEqual(self.observe()["status"],"registered-no-worker")
+        self.assertFalse((self.job/"real-worker.stdout").exists())
+
+    def test_real_backend_orphan_is_detected_without_automatic_kill_or_retry(self):
+        self.assertEqual(self.register().returncode,0)
+        fixture=subprocess.Popen(["/usr/bin/sleep","3"],start_new_session=True,
+                                 stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        try:
+            import importlib.util
+            spec=importlib.util.spec_from_file_location("real_orphan_supervisor",
+                           ROOT/"ops/acquisition-supervisor.py")
+            sup=importlib.util.module_from_spec(spec);spec.loader.exec_module(sup)
+            s=json.loads((self.job/"supervision.json").read_text())
+            s.update(status="running",worker_kind="real-acquisition",
+                     worker_pid=999999,worker_start_ticks=123456,attempts=1)
+            (self.job/"supervision.json").write_text(json.dumps(s))
+            (self.job/"real-acquisition-heartbeat.json").write_text(json.dumps({
+                "schema":"ghostmesh.reasonpack.acquisition-real-heartbeat.v1",
+                "job_id":self.receipt["job_id"],"worker_pid":999999,
+                "worker_start_ticks":123456,"backend_pid":fixture.pid,
+                "backend_start_ticks":sup.startticks(fixture.pid),
+                "backend_pgid":os.getpgid(fixture.pid),
+                "sequence":1,"time_utc":"2026-10-15T17:00:00+00:00"}))
+            observed=self.observe()
+            self.assertEqual(observed["status"],
+                             "orphaned-backend-active-reconciliation-required")
+            self.assertEqual(observed["potential_orphan_backend"]["pid"],fixture.pid)
+            self.assertFalse(observed["automatic_restart_authorized"])
+            self.assertFalse(observed["artifact_verified"])
+            self.assertIsNone(observed["verified_manifest_sha256"])
+        finally:
+            try:os.killpg(fixture.pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+            fixture.wait(timeout=3)
+
+    def test_forged_real_source_receipt_is_not_acquisition_success(self):
+        self.assertEqual(self.register().returncode,0)
+        s=json.loads((self.job/"supervision.json").read_text())
+        s.update(status="running",worker_kind="real-acquisition",worker_pid=999999,
+                 worker_start_ticks=111111,attempts=1)
+        (self.job/"supervision.json").write_text(json.dumps(s))
+        (self.job/"real-acquisition-result.json").write_text(json.dumps({
+            "schema":"ghostmesh.reasonpack.acquisition-real-backend.v1",
+            "status":"WORKER_VERIFIED_SOURCE_PACKAGE",
+            "job_id":"0"*64,"worker_pid":999999,"worker_start_ticks":111111,
+            "manifest_sha256":"f"*64}))
+        status=self.observe()
+        self.assertEqual(status["status"],"reconciliation-required-no-auto-retry")
+        self.assertFalse(status["artifact_verified"])
+        self.assertEqual(self.launch().returncode,2)
+
     def test_unauthenticated_input_cannot_grant_mail(self):
         bad=json.loads(self.input.read_text())
         bad["email_dispatch_authority"]=True
