@@ -102,14 +102,23 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
     backend=backend or imported("acquisition-real-worker")
     job=JOBS/job_id
     if job.is_symlink() or not job.is_dir():refuse("no registered job")
-    backend.preflight()
+    # The preflight may read bytes but must never execute acquisition before
+    # verifying the owner-signed grant from the trusted mail admission lane.
     fd=guard.lock(job)
     try:
         state=guard.state(job)
         if state.get("job_id")!=job_id or state.get("status")!="registered" or state.get("attempts")!=0:
             refuse("job not in unclaimed signed-admission state")
-        source=guard.validate_admission((job/"admission.json").read_bytes())
+        raw_admission=(job/"admission.json").read_bytes()
+        source=guard.validate_admission(raw_admission)
         if source["job_id"]!=job_id:refuse("job source mismatch")
+        # A worker-writable job JSON/hash is NEVER permission to launch.
+        # The only grant is signed by an external trusted Gmail intake signer,
+        # bound to this immutable release + the exact registered intent.
+        custody=imported("acquisition-signed-grant")
+        custody.verify_for_job(job,admission=raw_admission,
+                               supervision=state,release_commit=REPO.name)
+        backend.preflight()
         # A durable launch intent must precede logs and subprocess side effects.
         state.update(status="launch-intent-uncertain",worker_kind="real-acquisition",
                      attempts=1,work_started_at=datetime.now(timezone.utc).isoformat(),
@@ -119,28 +128,37 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
                      (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
         worker=REPO/"ops/acquisition-real-worker.py"
         if worker.is_symlink() or not worker.is_file():refuse("fixed real worker missing")
-        rfd,wfd=os.pipe()
-        proc=None
+        # Signed byte snapshot is passed on a sealed kernel memfd. Even if
+        # the worker-writable admission file changes after verification, the
+        # backend cannot consume a different video/source.
+        handoff=imported("acquisition-sealed-admission")
+        sealed_fd=handoff.seal_admission(raw_admission)
         try:
-            with open(job/"contained-worker.stdout","xb",buffering=0) as out,open(
-                 job/"contained-worker.stderr","xb",buffering=0) as err:
-                proc=child_runner([sys.executable,"-B",str(worker),
-                        "--job",str(job),"--gate-fd",str(rfd)],
-                     stdin=subprocess.DEVNULL,stdout=out,stderr=err,
-                     pass_fds=(rfd,),start_new_session=True,
-                     env={"PATH":"/usr/bin:/bin","LANG":"C.UTF-8"})
-            birth=guard.startticks(proc.pid)
-            if not isinstance(birth,int):refuse("child PID/start identity unavailable")
-            state.update(status="running",worker_pid=proc.pid,
-                         worker_start_ticks=birth,worker_command_verified=True,
-                         last_observation="contained source worker running, source unverified")
-            guard.atomic(job/"supervision.json",
-                         (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
-            os.write(wfd,b"G")
+            rfd,wfd=os.pipe()
+            proc=None
+            try:
+                with open(job/"contained-worker.stdout","xb",buffering=0) as out,open(
+                     job/"contained-worker.stderr","xb",buffering=0) as err:
+                    proc=child_runner([sys.executable,"-B",str(worker),
+                            "--job",str(job),"--gate-fd",str(rfd),
+                            "--admission-fd",str(sealed_fd)],
+                         stdin=subprocess.DEVNULL,stdout=out,stderr=err,
+                         pass_fds=(rfd,sealed_fd),start_new_session=True,
+                         env={"PATH":"/usr/bin:/bin","LANG":"C.UTF-8"})
+                birth=guard.startticks(proc.pid)
+                if not isinstance(birth,int):refuse("child PID/start identity unavailable")
+                state.update(status="running",worker_pid=proc.pid,
+                             worker_start_ticks=birth,worker_command_verified=True,
+                             last_observation="contained source worker running, source unverified")
+                guard.atomic(job/"supervision.json",
+                             (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
+                os.write(wfd,b"G")
+            finally:
+                os.close(rfd)
+                os.close(wfd)
+            rc=proc.wait()
         finally:
-            os.close(rfd)
-            os.close(wfd)
-        rc=proc.wait()
+            os.close(sealed_fd)
         # The only positive outcome is an independent re-verification
         # of the complete pack. A worker's exit code alone proves nothing.
         result=guard.observe(job)

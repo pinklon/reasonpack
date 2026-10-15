@@ -190,6 +190,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--job",type=Path,required=True)
     ap.add_argument("--gate-fd",type=int,required=True)
+    ap.add_argument("--admission-fd",type=int,required=True)
     args=ap.parse_args()
     try:
         # Defense in depth: the worker CLI itself must refuse a direct shell
@@ -208,7 +209,16 @@ def main():
                                                     REPO/"ops/acquisition-supervisor.py")
         mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
         if args.job.is_symlink() or not args.job.is_dir():deny("invalid job root")
-        source=mod.validate_admission((args.job/"admission.json").read_bytes())
+        # Never reread the worker-writable source file to choose a video.
+        # Use only the exact, signed-by-parent, kernel-sealed admission bytes.
+        sealed_path=REPO/"ops/acquisition-sealed-admission.py"
+        sealed_spec=importlib.util.spec_from_file_location("rp_sealed_admission",sealed_path)
+        sealed=importlib.util.module_from_spec(sealed_spec)
+        sealed_spec.loader.exec_module(sealed)
+        signed_snapshot=sealed.read_sealed_admission(args.admission_fd)
+        os.close(args.admission_fd)
+        source=mod.validate_admission(signed_snapshot)
+        if source["job_id"]!=args.job.name:deny("sealed job admission identity mismatch")
         state=mod.state(args.job)
         if (state["status"]!="running" or state["worker_kind"]!="real-acquisition"
             or state["worker_pid"]!=os.getpid() or
