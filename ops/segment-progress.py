@@ -48,9 +48,9 @@ def check_candidate(record,entry):
     if record.get("segment_sha256")!=entry["segment_sha256"] or record.get("prompt_sha256")!=entry["prompt_sha256"]:
         deny("candidate refers to wrong exact segment/prompt")
     observations=record.get("observations")
-    if not isinstance(observations,list) or not 1<=len(observations)<=18:deny("candidate observations missing or oversized")
+    if not isinstance(observations,list) or not 1<=len(observations)<=12:deny("candidate observations missing or oversized")
     for v in observations:
-        if not isinstance(v,str) or not v.strip() or len(v)>2200:deny("invalid segment observation")
+        if not isinstance(v,str) or not v.strip() or len(v)>1000:deny("invalid segment observation")
     if record.get("source_truth_attested") is not False or record.get("final_answer_authorized") is not False:
         deny("candidate cannot self-authorize research conclusion")
     if set(record)-{"schema","segment_index","segment_sha256","prompt_sha256","observations",
@@ -62,7 +62,7 @@ def stage(composition,results,index,candidate):
     if not isinstance(index,int) or index<0 or index>=len(parts):deny("segment index out of range")
     row=parts[index]
     raw=candidate.read_bytes()
-    if len(raw)>55_000:deny("oversized candidate")
+    if len(raw)>180_000:deny("oversized candidate")
     parsed=json.loads(raw)
     check_candidate(parsed,row)
     results.mkdir(parents=True,mode=0o700,exist_ok=True)
@@ -91,7 +91,7 @@ def status(composition,results):
             missing.append(i);continue
         if path.is_symlink() or not path.is_file():deny("invalid candidate member")
         raw=path.read_bytes()
-        if len(raw)>55_000:deny("oversized candidate member")
+        if len(raw)>180_000:deny("oversized candidate member")
         candidate=json.loads(raw)
         check_candidate(candidate,row)
         done.append({"index":i,"candidate_sha256":digest(raw)})

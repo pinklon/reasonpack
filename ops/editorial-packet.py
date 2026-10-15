@@ -82,7 +82,9 @@ def main():
                          "transcript_mode":"segmented"}
             inline_transcript=""
         else:
-            inline_transcript=transcript_path.read_text("utf-8")
+            # read_text() normalizes CRLF/CR; byte decoding preserves the
+            # exact input whose digest is recorded above.
+            inline_transcript=transcript_path.read_bytes().decode("utf-8")
             segment_ref={"transcript_mode":"inline","segment_count":1}
         approved_dir=(repo/"editorial/approved-works").resolve()
         approved_paths=sorted(approved_dir.glob("*.json"))

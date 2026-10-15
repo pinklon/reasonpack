@@ -82,7 +82,7 @@ def schema():
             }}
 
 def segment_candidate_schema(index,segment_sha,prompt_sha):
-    text={"type":"string","minLength":1,"maxLength":2200}
+    text={"type":"string","minLength":1,"maxLength":1000}
     return {"type":"object","additionalProperties":False,
             "required":["schema","segment_index","segment_sha256","prompt_sha256",
                         "observations","source_truth_attested","final_answer_authorized"],
@@ -91,7 +91,7 @@ def segment_candidate_schema(index,segment_sha,prompt_sha):
                 "segment_index":{"type":"integer","enum":[index]},
                 "segment_sha256":{"type":"string","enum":[segment_sha]},
                 "prompt_sha256":{"type":"string","enum":[prompt_sha]},
-                "observations":{"type":"array","minItems":1,"maxItems":18,"items":text},
+                 "observations":{"type":"array","minItems":1,"maxItems":12,"items":text},
                 "source_truth_attested":{"type":"boolean","enum":[False]},
                 "final_answer_authorized":{"type":"boolean","enum":[False]}
             }}

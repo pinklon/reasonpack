@@ -172,6 +172,21 @@ class LongFormTests(unittest.TestCase):
         self.assertEqual(len(partial["missing_indices"]),index["segment_count"]-1)
         self.assertIsNone(partial["actual_billed_cost"])
         self.assertEqual(partial["model_provider"],"UNKNOWN")
+        second=receipt["segment_prompt_receipts"][1]
+        large_obs={"schema":"ghostmesh.reasonpack.segment-candidate.v1",
+            "segment_index":1,"segment_sha256":second["segment_sha256"],
+            "prompt_sha256":second["prompt_sha256"],
+            "observations":["💠"*1000 for _ in range(12)],
+            "source_truth_attested":False,"final_answer_authorized":False}
+        large=self.t/"large-multilingual-segment.json"
+        large.write_text(json.dumps(large_obs))
+        self.assertGreater(large.stat().st_size,55_000)
+        self.assertLess(large.stat().st_size,180_000)
+        accepted=run("segment-progress.py","stage","--composition",output,
+                "--results",checkpoint,"--index",1,"--candidate",large)
+        self.assertEqual(accepted.returncode,0,accepted.stderr)
+        self.assertEqual(json.loads(run("segment-progress.py","status",
+                    "--composition",output,"--results",checkpoint).stdout)["segments_staged"],2)
         candidate=self.t/"fake-analysis.json"
         d=json.loads((ROOT/"examples/reader-synthetic-analysis.json").read_text())
         candidate.write_text(json.dumps(d))
@@ -206,6 +221,29 @@ class LongFormTests(unittest.TestCase):
         self.assertGreater(json.loads(r.stdout)["count"],40)
         self.assertEqual(run("longform-segments.py","verify","--transcript",self.pack/"transcript.txt",
                     "--segments",self.parts).returncode,0)
+
+    def test_inline_transcript_preserves_crlf_source_bytes(self):
+        self.pack.rename(self.t/"old")
+        self.pack=self.t/"source"
+        make_pack(self.pack,minutes=1)
+        path=self.pack/"transcript.txt"
+        exact=path.read_bytes().replace(b"\n",b"\r\n")
+        path.write_bytes(exact)
+        manifest=json.loads((self.pack/"manifest.json").read_text())
+        for item in manifest["members"]:
+            if item["path"]=="transcript.txt":
+                item["bytes"]=len(exact)
+                item["sha256"]=sha(exact)
+        (self.pack/"manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+        names=[i["path"] for i in manifest["members"]]+["manifest.json"]
+        (self.pack/"SHA256SUMS.txt").write_text("".join(
+            sha((self.pack/n).read_bytes())+"  "+n+"\n" for n in names))
+        packet=self.t/"inline.json"
+        r=run("editorial-packet.py","--pack",self.pack,"--out",packet)
+        self.assertEqual(r.returncode,0,r.stderr)
+        document=json.loads(packet.read_text())
+        self.assertEqual(document["untrusted_transcript"].encode("utf-8"),exact)
+        self.assertEqual(document["transcript_sha256"],sha(exact))
 
     def test_no_segments_means_clear_hold_not_duration_rejection(self):
         p=run("editorial-packet.py","--pack",self.pack,"--out",self.t/"missing.json")
