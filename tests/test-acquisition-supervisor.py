@@ -142,6 +142,36 @@ class DurableTests(unittest.TestCase):
         self.assertFalse(stopped["automatic_restart_authorized"])
         self.assertFalse(stopped["synthetic_completion_reported"])
         self.assertEqual(self.launch().returncode,2)
+    def test_real_network_launch_requires_explicit_pin_and_operator_switch(self):
+        self.assertEqual(self.register().returncode,0)
+        wrong=cli("launch-real","--job",self.job,
+                   "--permit-network-acquisition",
+                   "--expected-cli-sha256","b"*64)
+        self.assertEqual(wrong.returncode,2)
+        self.assertEqual(self.observe()["status"],"registered-no-worker")
+        unpermitted=cli("launch-real","--job",self.job,
+                        "--expected-cli-sha256",
+                        "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef")
+        self.assertEqual(unpermitted.returncode,2)
+        self.assertEqual(self.observe()["status"],"registered-no-worker")
+        self.assertFalse((self.job/"real-worker.stdout").exists())
+
+    def test_forged_real_source_receipt_is_not_acquisition_success(self):
+        self.assertEqual(self.register().returncode,0)
+        s=json.loads((self.job/"supervision.json").read_text())
+        s.update(status="running",worker_kind="real-acquisition",worker_pid=999999,
+                 worker_start_ticks=111111,attempts=1)
+        (self.job/"supervision.json").write_text(json.dumps(s))
+        (self.job/"real-acquisition-result.json").write_text(json.dumps({
+            "schema":"ghostmesh.reasonpack.acquisition-real-backend.v1",
+            "status":"WORKER_VERIFIED_SOURCE_PACKAGE",
+            "job_id":"0"*64,"worker_pid":999999,"worker_start_ticks":111111,
+            "manifest_sha256":"f"*64}))
+        status=self.observe()
+        self.assertEqual(status["status"],"reconciliation-required-no-auto-retry")
+        self.assertFalse(status["artifact_verified"])
+        self.assertEqual(self.launch().returncode,2)
+
     def test_unauthenticated_input_cannot_grant_mail(self):
         bad=json.loads(self.input.read_text())
         bad["email_dispatch_authority"]=True
