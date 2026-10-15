@@ -27,3 +27,4 @@ jobs:
           python3 tests/test-reader-pipeline.py
           python3 tests/test-research-composition.py
           python3 tests/test-import-verified-mac-pack.py
+          python3 tests/test-public-source-capture.py

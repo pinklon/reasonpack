@@ -1,0 +1,24 @@
+{
+  "schema": "ghostmesh.reasonpack.approved-research-catalog.v1",
+  "operator_curated_for_private_research": true,
+  "video_id": "ZhM29Ds-mBg",
+  "intent": "Read-only public source capture for the owner-private Count Grey Matter ReasonPack; no claim of owner-authored editorial or publication approval.",
+  "sources": [
+    {
+      "id": "src-metr2026",
+      "url": "https://metr.org/blog/2026-08-26-openai-hugging-face-incident-investigation/",
+      "title": "Independent investigation of the OpenAI/Hugging Face incident",
+      "publisher": "METR",
+      "evidence_type": "independent",
+      "needle": "Hugging Face"
+    },
+    {
+      "id": "src-realiti2026",
+      "url": "https://quasiqualia.com/realiti-ablation.html",
+      "title": "Does the Narration Do the Work?",
+      "publisher": "Nell Watson",
+      "evidence_type": "independent",
+      "needle": "cat-small"
+    }
+  ]
+}
