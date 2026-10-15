@@ -192,6 +192,16 @@ def main():
     ap.add_argument("--gate-fd",type=int,required=True)
     args=ap.parse_args()
     try:
+        # Defense in depth: the worker CLI itself must refuse a direct shell
+        # execution outside the same exact, job-scoped systemd service.
+        import importlib.util
+        contract=REPO/"ops/acquisition-cgroup-runner.py"
+        spec=importlib.util.spec_from_file_location("rp_cgroup_worker_guard",contract)
+        contained=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(contained)
+        contained.verify_containment(args.job.name)
+        if args.job.resolve()!=contained.JOBS/args.job.name:
+            deny("real worker job path escaped dedicated contained root")
         if os.read(args.gate_fd,1)!=b"G":deny("no authorized parent release")
         os.close(args.gate_fd)
         spec=importlib.util.spec_from_file_location("acquisition_source_guard",

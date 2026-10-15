@@ -328,59 +328,6 @@ def start_fixture(jobdir,ticks,period_ms):
                 "real_acquisition_started":False}
     finally:os.close(fd)
 
-def start_real(jobdir,expected_cli_sha,permit_network):
-    """Manual, explicit source-only adapter. Never used by legacy intake."""
-    if permit_network is not True:
-        fail("real network acquisition requires explicit operator authorization")
-    spec=importlib.util.spec_from_file_location("reasonpack_real_backend",
-                                               ROOT/"ops/acquisition-real-worker.py")
-    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    if expected_cli_sha!=module.PIN:
-        fail("operator-approved CLI digest does not match reviewed source pin")
-    module.preflight()
-    fd=lock(jobdir)
-    try:
-        s=state(jobdir)
-        if s["status"]!="registered" or s["attempts"]!=0:
-            fail("source worker was already claimed or is uncertain")
-        admitted=validate_admission((jobdir/"admission.json").read_bytes())
-        worker=ROOT/"ops/acquisition-real-worker.py"
-        if worker.is_symlink() or not worker.is_file():
-            fail("fixed real worker implementation missing")
-        s.update(status="launch-intent-uncertain",worker_kind="real-acquisition",
-                 attempts=1,worker_command_verified=False,
-                 work_started_at=utc(),
-                 last_observation="real acquisition explicitly claimed, worker result unknown")
-        atomic(jobdir/"supervision.json",
-               (json.dumps(s,indent=2,sort_keys=True)+"\n").encode(),replace=True)
-        readfd,writefd=os.pipe()
-        proc=None
-        try:
-            with open(jobdir/"real-worker.stdout","xb",buffering=0) as out,open(
-                    jobdir/"real-worker.stderr","xb",buffering=0) as err:
-                proc=subprocess.Popen([sys.executable,"-B",str(worker),
-                                       "--job",str(jobdir),"--gate-fd",str(readfd)],
-                             stdin=subprocess.DEVNULL,stdout=out,stderr=err,
-                             pass_fds=(readfd,),start_new_session=True,
-                             env={"PATH":"/usr/bin:/bin","LANG":"C.UTF-8"})
-            birth=startticks(proc.pid)
-            if not isinstance(birth,int):fail("real worker PID/start identity unavailable")
-            s.update(status="running",worker_pid=proc.pid,
-                     worker_start_ticks=birth,worker_command_verified=True,
-                     last_observation="real worker started, acquisition still unverified")
-            atomic(jobdir/"supervision.json",
-                   (json.dumps(s,indent=2,sort_keys=True)+"\n").encode(),replace=True)
-            os.write(writefd,b"G")
-        finally:
-            os.close(readfd)
-            os.close(writefd)
-        return {"status":"source-worker-started-unverified",
-                "pid":proc.pid,"job_id":admitted["job_id"],
-                "mission_elapsed_cutoff":None,
-                "email_dispatched":False,"public_release":False}
-    finally:
-        os.close(fd)
-
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     sub=p.add_subparsers(dest="cmd",required=True)
@@ -389,20 +336,15 @@ def main():
     register_cmd.add_argument("--root",type=Path,required=True)
     register_cmd.add_argument("--envelope",type=Path,required=True)
     register_cmd.add_argument("--allow-sender",action="append",required=True)
-    for verb in ("launch-fixture","launch-real","status"):
+    for verb in ("launch-fixture","status"):
         s=sub.add_parser(verb);s.add_argument("--job",type=Path,required=True)
         if verb=="launch-fixture":
             s.add_argument("--ticks",type=int,default=5)
             s.add_argument("--period-ms",type=int,default=100)
-        if verb=="launch-real":
-            s.add_argument("--permit-network-acquisition",action="store_true")
-            s.add_argument("--expected-cli-sha256",required=True)
     a=p.parse_args()
     try:
         if a.cmd=="register":result=register(a.admission,a.root,a.envelope,a.allow_sender)
         elif a.cmd=="launch-fixture":result=start_fixture(a.job,a.ticks,a.period_ms)
-        elif a.cmd=="launch-real":
-            result=start_real(a.job,a.expected_cli_sha256,a.permit_network_acquisition)
         else:result=observe(a.job)
         print(json.dumps(result,sort_keys=True));return 0
     except (ValueError,TypeError,KeyError,FileNotFoundError,OSError,
