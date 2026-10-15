@@ -220,11 +220,20 @@ def validate(args):
     reader.load_analysis(args.candidate)
     if candidate.get("video_id")!=identity["video_id"]:
         refuse("model output refers to the wrong video")
+    synthesis_proof=None
     if packet.get("transcript_mode")=="segmented":
-        # Whole-video conclusions must not be qualified from the initial
-        # map prompts alone. A separate all-segment reconciliation gate
-        # is required; this branch does not silently attest it.
-        refuse("segmented source needs all-segment synthesis receipt before final validation")
+        if not args.synthesis or not args.composition or not args.segment_results:
+            refuse("segmented source needs verified all-segment synthesis receipt before final validation")
+        sy=mod("longform-synthesis")
+        synthesis_proof=sy.verify(args.composition,args.segment_results,args.synthesis)
+        if (synthesis_proof.get("source_video_id")!=identity["video_id"] or
+                synthesis_proof.get("source_research_packet_sha256")!=identity["packet_sha256"] or
+                synthesis_proof.get("evidence_registry_sha256")!=identity["registry_sha256"] or
+                synthesis_proof.get("segments_covered")!=packet.get("segment_count") or
+                synthesis_proof.get("semantic_review")!="NOT_ATTESTED"):
+            refuse("synthesis coverage source identity does not match long-form research")
+    elif args.synthesis or args.composition or args.segment_results:
+        refuse("inline analysis cannot claim segmented synthesis")
     ev=mod("research-evidence")
     support=ev.assert_supported_claims(candidate,registry)
     approved={(w["title"],w["url"],w["source_commit"])
@@ -239,6 +248,11 @@ def validate(args):
              "candidate_sha256":digest(candidate_raw),
              "bound_citation_count":support["bound_citations"],
              "semantic_review":"NOT_ATTESTED",
+             "all_segment_coverage_sha256": (
+                  digest((args.synthesis/"coverage-receipt.json").read_bytes())
+                  if synthesis_proof else None),
+             "all_segment_coverage_status": (
+                  "complete-unreviewed" if synthesis_proof else "not_applicable"),
              "owner_approved":False,"email_dispatch_authority":False,"public_release":False}
     if args.out.exists():refuse("validation output already exists")
     safe_write(args.out,(json.dumps(receipt,indent=2,sort_keys=True)+"\n").encode())
@@ -254,7 +268,11 @@ def main():
         s.add_argument("--registry",type=Path,required=True)
         s.add_argument("--out",type=Path,required=True)
         if cmd=="prepare":s.add_argument("--segments",type=Path)
-        if cmd=="validate":s.add_argument("--candidate",type=Path,required=True)
+        if cmd=="validate":
+            s.add_argument("--candidate",type=Path,required=True)
+            s.add_argument("--synthesis",type=Path)
+            s.add_argument("--composition",type=Path)
+            s.add_argument("--segment-results",type=Path)
     args=p.parse_args()
     try:
         result=prepare(args) if args.command=="prepare" else validate(args)

@@ -30,3 +30,4 @@ jobs:
           python3 tests/test-public-source-capture.py
           python3 tests/test-longform-segments.py
           python3 tests/test-mission-receipt.py
+          python3 tests/test-longform-synthesis.py

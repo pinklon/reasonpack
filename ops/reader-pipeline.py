@@ -281,11 +281,17 @@ def ingest_analysis(args):
         research = import_script("research-evidence")
         corroboration = research.assert_supported_claims(analysis, research.verified_register(registry, args.job / "research-input.json"))
         validation_path=args.job/"research-validation-receipt.json"
-        execute([sys.executable,str(ROOT/"ops/research-composer.py"),"validate",
+        validation_cmd=[sys.executable,str(ROOT/"ops/research-composer.py"),"validate",
                  "--packet",str(args.job/"research-input.json"),
                  "--registry",str(registry),
                  "--candidate",str(args.analysis),
-                 "--out",str(validation_path)])
+                 "--out",str(validation_path)]
+        if composition.get("transcript_mode")=="segmented":
+            validation_cmd.extend([
+                 "--composition",str(args.job/"composition"),
+                 "--segment-results",str(args.job/"segment-results"),
+                 "--synthesis",str(args.job/"synthesis")])
+        execute(validation_cmd)
         if (data(validation_path).get("semantic_review")!="NOT_ATTESTED" or
                 data(validation_path).get("candidate_sha256")!=digest(raw)):
             reject("machine-generated research cannot self-attest or modify source")
@@ -294,6 +300,8 @@ def ingest_analysis(args):
         return advance(args.job, flow, "analysis-unreviewed",
                        {"analysis_sha256": digest(raw), "editorial_review": "required",
                         "citation_register_bound": corroboration["bound_citations"],
+                        "all_segment_coverage_sha256":
+                           data(validation_path).get("all_segment_coverage_sha256"),
                         "semantic_source_review": "NOT_ATTESTED"})
     finally:
         os.close(fd)
