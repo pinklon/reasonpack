@@ -38,3 +38,4 @@ jobs:
           python3 tests/test-release-preflight.py
           python3 tests/test-acquisition-signed-grant.py
           python3 tests/test-acquisition-sealed-admission.py
+          python3 tests/test-owner-launch-claims.py

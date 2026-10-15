@@ -8,6 +8,9 @@ Wants=network-online.target
 Type=exec
 User=ghostmesh
 Group=ghostmesh
+# + runs only this pinned, reviewed, fixed-argument root-owned claim helper.
+# The helper consumes an owner-only ledger slot before any user worker starts.
+ExecStartPre=+/usr/bin/python3 @IMMUTABLE_RELEASE_DIR@/ops/acquisition-owner-prestart.py --job-id %i
 ExecStart=/usr/bin/python3 @IMMUTABLE_RELEASE_DIR@/ops/acquisition-cgroup-runner.py --job-id %i
 WorkingDirectory=@IMMUTABLE_RELEASE_DIR@
 Environment=PYTHONDONTWRITEBYTECODE=1

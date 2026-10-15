@@ -30,7 +30,9 @@ class ReleaseTests(unittest.TestCase):
     def test_immutable_commit_release_unit(self):
         unit=P.render(COMMIT)
         expected=str(P.release_path(COMMIT))
-        self.assertEqual(unit.count(expected),2)
+        self.assertEqual(unit.count(expected),3)
+        self.assertIn("ExecStartPre=+/usr/bin/python3 "+expected+
+           "/ops/acquisition-owner-prestart.py --job-id %i",unit)
         self.assertIn("WorkingDirectory="+expected,unit)
         self.assertIn("ExecStart=/usr/bin/python3 "+expected+"/ops/acquisition-cgroup-runner.py --job-id %i",unit)
         self.assertNotIn("@IMMUTABLE_RELEASE_DIR@",unit)
@@ -126,7 +128,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_protected_unit_unmodified_in_source(self):
         unit=P.SOURCE_TEMPLATE.read_text()
-        self.assertEqual(unit.count("@IMMUTABLE_RELEASE_DIR@"),2)
+        self.assertEqual(unit.count("@IMMUTABLE_RELEASE_DIR@"),3)
         self.assertNotIn("/runtime/reasonpack/current",unit)
 
 if __name__=="__main__":

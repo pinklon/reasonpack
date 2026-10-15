@@ -73,8 +73,10 @@ def verify_install_contract(unit_text):
         refuse("write authority must be limited to the exact instance job directory")
     if not unit.get("Description","").startswith("GhostMesh ReasonPack"):
         refuse("unexpected systemd service purpose")
-    if "ExecStartPre" in svc or "ExecStopPost" in svc:
-        refuse("unreviewed pre/post operational actions")
+    if svc.get("ExecStartPre")!=(
+        "+/usr/bin/python3 @IMMUTABLE_RELEASE_DIR@/ops/acquisition-owner-prestart.py --job-id %i"
+    ) or "ExecStopPost" in svc:
+        refuse("missing exact audited privileged one-time grant claim")
     if svc.get("ProtectControlGroups")!="yes" or svc.get("PrivateDevices")!="yes":
         refuse("missing cgroup or device protection")
     return {"unit_template":"ghostmesh-reasonpack-acquire@.service",
@@ -82,6 +84,26 @@ def verify_install_contract(unit_text):
             "cgroup_kill_policy":"control-group",
             "total_duration_limit":None,
             "network_acquisition_performed":False}
+
+def verify_primary_runner(job_id,*,run=subprocess.run):
+    """Only systemd's own MainPID may spend this unit's root-owned permit.
+
+    A worker process in the same cgroup cannot become the original ExecStart
+    PID and therefore cannot launch a second acquisition via a nested runner.
+    """
+    unit=verify_containment(job_id)
+    try:
+        result=run(["/usr/bin/systemctl","show",unit,"-p","MainPID","--value",
+                    "--no-pager"],
+                   stdin=subprocess.DEVNULL,capture_output=True,text=True,
+                   timeout=6,env={"PATH":"/usr/bin:/bin","LC_ALL":"C"})
+    except (OSError,subprocess.SubprocessError):
+        refuse("systemd main PID readback unavailable")
+    if result.returncode!=0 or not result.stdout.strip().isdigit():
+        refuse("systemd main PID readback not authoritative")
+    if int(result.stdout.strip())!=os.getpid() or os.getpid()<=1:
+        refuse("only systemd registered primary runner may launch acquisition")
+    return {"unit":unit,"main_pid":os.getpid(),"readback":"systemd-mainpid"}
 
 def jobdir_for(job_id):
     verify_containment(job_id)
@@ -97,7 +119,7 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
     Systemd owns *this parent unit* and all subprocess descendants; the cgroup
     stops as one boundary even if worker or backend starts a new session.
     """
-    verify_containment(job_id)
+    verify_primary_runner(job_id)
     guard=guard or imported("acquisition-supervisor")
     backend=backend or imported("acquisition-real-worker")
     job=JOBS/job_id
@@ -116,8 +138,12 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
         # The only grant is signed by an external trusted Gmail intake signer,
         # bound to this immutable release + the exact registered intent.
         custody=imported("acquisition-signed-grant")
-        custody.verify_for_job(job,admission=raw_admission,
+        approved=custody.verify_for_job(job,admission=raw_admission,
                                supervision=state,release_commit=REPO.name)
+        # A root-only systemd ExecStartPre must have consumed this exact
+        # grant first, in a durable ledger outside worker-writable storage.
+        owner=imported("acquisition-owner-prestart")
+        owner.verified_owner_permit(approved)
         backend.preflight()
         # A durable launch intent must precede logs and subprocess side effects.
         state.update(status="launch-intent-uncertain",worker_kind="real-acquisition",
