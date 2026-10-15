@@ -194,6 +194,17 @@ def collect_evidence(args):
         expected = flow["events"][-1]["evidence"]["research_packet_sha256"]
         if digest(research_input.read_bytes()) != expected:
             reject("research input changed before evidence admission")
+        capture_status="MANUAL_REGISTRY_ONLY"
+        if bool(args.capture_dir) != bool(args.catalog):
+            reject("capture evidence and approved catalog must be provided together")
+        if args.capture_dir:
+            if args.registry.resolve()!= (args.capture_dir/"research-evidence.json").resolve():
+                reject("requested registry does not match pinned capture directory")
+            collector=import_script("public-source-capture")
+            proof=collector.verify_capture(research_input,args.catalog,args.capture_dir)
+            if proof.get("registry_sha256") != digest(args.registry.read_bytes()):
+                reject("capture receipt not bound to exact research registry")
+            capture_status="SOURCE_BYTES_VERIFIED"
         script = import_script("research-evidence")
         record = script.verified_register(args.registry, research_input)
         raw = args.registry.read_bytes()
@@ -201,6 +212,7 @@ def collect_evidence(args):
         return advance(args.job, flow, "research-evidence-verified",
                        {"evidence_registry_sha256": digest(raw),
                         "registered_sources": len(record["sources"]),
+                        "capture_status": capture_status,
                         "independent_semantic_review": "NOT_PERFORMED"})
     finally:
         os.close(fd)
@@ -318,6 +330,8 @@ def main():
     source = sub.add_parser("source"); source.add_argument("--job", type=Path, required=True); source.add_argument("--pack", type=Path, required=True)
     research = sub.add_parser("research"); research.add_argument("--job", type=Path, required=True); research.add_argument("--public-work", type=Path, action="append", default=[])
     evidence = sub.add_parser("evidence"); evidence.add_argument("--job",type=Path,required=True); evidence.add_argument("--registry",type=Path,required=True)
+    evidence.add_argument("--capture-dir",type=Path)
+    evidence.add_argument("--catalog",type=Path)
     model = sub.add_parser("compose"); model.add_argument("--job", type=Path, required=True)
     analysis = sub.add_parser("analysis"); analysis.add_argument("--job", type=Path, required=True); analysis.add_argument("--analysis", type=Path, required=True)
     read = sub.add_parser("render"); read.add_argument("--job", type=Path, required=True)
