@@ -168,14 +168,19 @@ def build(url,target,*,run=invoke,probe_media=probe):
         write_json(stage/"ffprobe.json",vp)
         run(["yt-dlp","--ignore-config","--no-playlist","--skip-download",
              "--write-subs","--write-auto-subs",
-             "--sub-langs","en-orig,en","--sub-format","vtt",
+             "--sub-langs","en-orig,en,en.*","--sub-format","vtt",
              "-o",str(stage/"captions.%(ext)s"),url])
-        options=[stage/name for name in ("captions.en-orig.vtt","captions.en.vtt")
-                 if (stage/name).is_file()]
+        regional=sorted(x for x in stage.glob("captions.en-*.vtt")
+                        if re.fullmatch(r"captions\.en-[A-Za-z0-9-]+\.vtt",x.name)
+                        and x.name!="captions.en-orig.vtt")
+        choices=[stage/"captions.en-orig.vtt",stage/"captions.en.vtt",*regional]
+        options=[x for x in choices if x.is_file() and not x.is_symlink()]
         if not options:hold("no English captions; transcription required")
         chosen=options[0]
         os.replace(chosen,stage/"captions.vtt")
-        for extra in options[1:]:
+        # Do not leave auxiliary caption language files in a strictly
+        # inventoried seven-member canonical package.
+        for extra in stage.glob("captions.*.vtt"):
             if extra.exists():extra.unlink()
         transcript,captions=timed_vtt((stage/"captions.vtt").read_bytes())
         (stage/"transcript.txt").write_bytes(transcript)

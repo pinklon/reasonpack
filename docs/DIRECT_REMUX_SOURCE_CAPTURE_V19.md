@@ -29,3 +29,7 @@ tests/test-direct-remux-pack.py stubs download/probe operations and runs the act
 If direct media is unavailable, stop rather than bypass YouTube account restrictions or automatically start expensive transcoding. Never claim the source video is independently factually verified merely because package digests match. This does not replace owner-signed Gmail admission and immutable service custody in PR #18.
 
 Videos several hours long remain supported by streaming SHA and per-stage checkpoints, not a video-duration limit. No arbitrary full-mission timeout is added.
+
+## Regional-caption fallback
+
+Accept source English tracks in order en-orig, en, then en-US/en-GB/en-* regional variants, keeping only the single selected VTT in the canonical source inventory. Unavailable original English and regional English still fail closed rather than substituting another language or running unexpected paid transcription.

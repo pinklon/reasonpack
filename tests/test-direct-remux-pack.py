@@ -105,6 +105,23 @@ class DirectPackTests(unittest.TestCase):
         self.assertIn(b"Another idea.",txt)
         with self.assertRaisesRegex(ValueError,"not WebVTT"):
             M.timed_vtt(b"not captions")
+    def test_regional_english_captions_complete_canonical_package(self):
+        def regional_runner(argv,*,stdout=None):
+            self.fake_run(argv,stdout=stdout)
+            if "--write-subs" in argv:
+                template=Path(argv[argv.index("-o")+1])
+                for name in ("captions.en-orig.vtt","captions.en.vtt"):
+                    template.with_name(name).unlink()
+                template.with_name("captions.en-US.vtt").write_bytes(VTT)
+        result=M.build(URL,self.tmp/"regional",run=regional_runner,
+                       probe_media=self.fake_probe)
+        self.assertEqual(result["status"],"canonical-direct-remux-verified")
+        self.assertEqual((self.tmp/"regional/captions.vtt").read_bytes(),VTT)
+        names={p.name for p in (self.tmp/"regional").iterdir()}
+        self.assertNotIn("captions.en-US.vtt",names)
+        self.assertTrue(any("--sub-langs" in c and any("en.*" in arg for arg in c)
+                            for c in self.calls if c[0]=="yt-dlp"))
+
     def test_installed_alias_can_find_pinned_helper_without_network(self):
         import shutil
         installed=self.tmp/"share/reasonpack"
