@@ -82,8 +82,21 @@ def validate_direct_media(video,audio,video_probe,audio_probe):
         ad=float(audio_probe["format"]["duration"])
     except (ValueError,KeyError,TypeError):
         hold("media duration unavailable")
-    if vd<=0 or ad<=0 or abs(vd-ad)>max(5,vd*0.01):
-        hold("video/audio durations disagree")
+    try:
+        actual_video=float(next(x["duration"] for x in tracks
+                                if x.get("codec_type")=="video"))
+        actual_audio=float(next(x["duration"] for x in tracks
+                                if x.get("codec_type")=="audio"))
+        extracted_audio=float(next(x["duration"] for x in audio_probe.get("streams",[])
+                                   if x.get("codec_type")=="audio"))
+    except (ValueError,KeyError,TypeError,StopIteration):
+        hold("exact per-stream video/audio durations unavailable")
+    durations=(vd,ad,actual_video,actual_audio,extracted_audio)
+    if any(x<=0 for x in durations):
+        hold("invalid video/audio stream duration")
+    tolerance=max(5,vd*0.01)
+    if any(abs(x-actual_video)>tolerance for x in durations):
+        hold("video/audio stream durations disagree")
     if any(not p.is_file() or p.is_symlink() or p.stat().st_size==0 for p in (video,audio)):
         hold("invalid direct media member")
     return {"video_codec":vc[0],"audio_codec":"aac","duration_seconds":vd}

@@ -12,10 +12,10 @@ ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("reasonpack_direct_remux",ROOT/"ops/direct-remux-pack.py")
 M=importlib.util.module_from_spec(spec);spec.loader.exec_module(M)
 URL="https://www.youtube.com/watch?v=jEOUUAPC1sc"
-VIDEO={"streams":[{"codec_type":"video","codec_name":"av1"},
-                  {"codec_type":"audio","codec_name":"aac"}],
+VIDEO={"streams":[{"codec_type":"video","codec_name":"av1","duration":"30.5"},
+                  {"codec_type":"audio","codec_name":"aac","duration":"30.5"}],
        "format":{"duration":"30.5"}}
-AUDIO={"streams":[{"codec_type":"audio","codec_name":"aac"}],
+AUDIO={"streams":[{"codec_type":"audio","codec_name":"aac","duration":"30.5"}],
        "format":{"duration":"30.5"}}
 VTT=b"WEBVTT\nKind: captions\nLanguage: en\n\n00:00:00.000 --> 00:00:03.000\nHello from Argon.\n\n00:00:27.000 --> 00:00:30.000\nAnother idea.\n"
 
@@ -99,6 +99,16 @@ class DirectPackTests(unittest.TestCase):
                                 "format":{"duration":"20.0"}})):
             with self.subTest(data=obj),self.assertRaises(ValueError):
                 M.validate_direct_media(self.tmp/"media",self.tmp/"audio",obj,atr)
+    def test_short_video_stream_fails_even_when_container_and_audio_match(self):
+        from copy import deepcopy
+        video=deepcopy(VIDEO)
+        audio=deepcopy(AUDIO)
+        video["streams"][0]["duration"]="15.0"
+        # Both MP4 and M4A container durations still report 30.5 seconds.
+        with self.assertRaisesRegex(ValueError,"stream durations disagree"):
+            M.validate_direct_media(self.tmp/"video.mp4",self.tmp/"audio.m4a",
+                                    video,audio)
+
     def test_caption_coverage_and_normalization(self):
         txt,meta=M.timed_vtt(VTT)
         self.assertEqual(meta["source_cue_count"],2)

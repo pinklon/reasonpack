@@ -43,3 +43,7 @@ The original VTT remains captured verbatim. The normalized transcript groups pay
 Repeated words after a gap are preserved: only overlapping sequences of at least two words in simultaneous or nearly adjacent caption cues are removed. This deliberately prefers retaining ambiguous repetitions over deleting real speech. An English caption track is accepted only after WebVTT parsing, timestamp checks and near-end coverage pass; unusable en-orig tracks trigger an independent attempt using en or a regional variant. The exact original selected VTT is preserved and remains authoritative for quote verification.
 
 Near-end transcript coverage never counts empty or markup-only WebVTT cues as spoken content; an unusable preferred track cannot suppress an available complete alternative. Full media bytes and original VTT remain independently checksummed.
+
+## Per-stream timing custody
+
+Fast mode compares the actual video-stream and audio-stream durations inside the MP4 and the independently extracted M4A audio duration, not merely MP4 container duration. A long audio track must not conceal a truncated video stream. Sources without reliable track duration metadata fail closed; the legacy full build remains an explicit operator alternative.
