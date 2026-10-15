@@ -33,3 +33,7 @@ Videos several hours long remain supported by streaming SHA and per-stage checkp
 ## Regional-caption fallback
 
 Accept source English tracks in order en-orig, en, then en-US/en-GB/en-* regional variants, keeping only the single selected VTT in the canonical source inventory. Unavailable original English and regional English still fail closed rather than substituting another language or running unexpected paid transcription.
+
+## Rolling-caption normalization
+
+The original VTT remains captured verbatim. The normalized transcript groups payload by WebVTT cue and removes the longest previously spoken word overlap, both within one rolling cue and across successive cues, retaining only novel words. It does not treat caption cue IDs as spoken text. Timestamp coverage uses the maximum cue endpoint, which accepts valid overlapping cues, and both MM:SS.mmm and HH:MM:SS.mmm timestamp forms. This heuristic is for readable search/reasoning text, not an independently verified verbatim transcription; disputed quotes must be checked against the source audio or VTT.

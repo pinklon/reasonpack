@@ -158,6 +158,22 @@ class DirectPackTests(unittest.TestCase):
                if c[0]=="yt-dlp" and "--sub-langs" in c]
         self.assertEqual(langs,["en-orig","en"])
 
+    def test_rolling_caption_overlap_is_removed_without_dropping_new_words(self):
+        cues=(b"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\n"
+              b"I have used Gemini\n\n"
+              b"00:00:03.000 --> 00:00:05.000\n"
+              b"I have used Gemini\nfor Argon\n\n"
+              b"00:00:05.000 --> 00:00:07.000\n"
+              b"for Argon\nfor the last seven days\n")
+        transcript,record=M.timed_vtt(cues)
+        self.assertEqual(record["source_cue_count"],3)
+        self.assertEqual(transcript,
+                         b"I have used Gemini\nfor Argon\nfor the last seven days\n")
+        duplicates=(b"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nA\nB\n\n"
+                    b"00:00:03.000 --> 00:00:05.000\nA\nB\nC\n")
+        normalized,_=M.timed_vtt(duplicates)
+        self.assertEqual(normalized,b"A B\nC\n")
+
     def test_overlapping_webvtt_cues_are_valid_and_counted(self):
         clip=(b"WEBVTT\n\n00:00:00.000 --> 00:00:10.000\n"
               b"Long first cue.\n\n00:00:02.000 --> 00:00:05.000\n"

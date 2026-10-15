@@ -93,33 +93,57 @@ def timed_vtt(raw):
         hold("caption file missing or oversized")
     text=raw.decode("utf-8-sig",errors="replace")
     if not text.lstrip().startswith("WEBVTT"):hold("caption payload not WebVTT")
-    last=None; lines=[]; latest=-1.0; previous_start=-1.0; cues=0
+    lines=[]; latest=-1.0; previous_start=-1.0; cues=0
+    spoken=[]
+    cue_lines=[]
+
+    def remove_rolling_overlap(previous,incoming):
+        # A later automatic caption may include repeated context from earlier
+        # cues. Preserve only the new suffix; original VTT remains unmodified.
+        length=min(len(previous),len(incoming),256)
+        for size in range(length,0,-1):
+            if previous[-size:]==incoming[:size]:
+                return incoming[size:]
+        return incoming
+
+    def finish_cue():
+        nonlocal cue_lines
+        if not cue_lines:return
+        current=[]
+        for line in cue_lines:
+            clean=unescape(re.sub(r"<[^>]*>","",line)).strip()
+            words=re.sub(r"\s+"," ",clean).split()
+            if words:current.extend(remove_rolling_overlap(current,words))
+        fresh=remove_rolling_overlap(spoken,current)
+        if fresh:
+            spoken.extend(fresh)
+            lines.append(" ".join(fresh))
+        cue_lines=[]
+
     rows=text.splitlines()
     active=False
     for index,line in enumerate(rows):
         m=TIME.match(line)
         if m:
+            finish_cue()
             start=vtt_seconds(m.group("start"))
             endpoint=vtt_seconds(m.group("end"))
             if start<0 or endpoint<start or (previous_start>=0 and start<previous_start):
                 hold("out-of-order or invalid caption cue timing")
             previous_start=start
-            # WebVTT cues can legally overlap. A later cue may end before
-            # an earlier one; source coverage is the MAXIMUM observed end.
+            # WebVTT cues may overlap. Coverage is the furthest endpoint,
+            # not the end of the last cue in presentation order.
             latest=max(latest,endpoint)
             cues+=1
             active=True
             continue
-        # WebVTT cue identifiers occur immediately BEFORE the time line.
-        # Do not mistake them for spoken text in an already-active block.
+        # Named/numbered WebVTT cue IDs occur immediately BEFORE timing.
         if index+1<len(rows) and TIME.match(rows[index+1]):
             continue
         if not active or not line.strip() or line.startswith(("Kind:","Language:","NOTE")):
             continue
-        normalized=unescape(re.sub(r"<[^>]*>","",line)).strip()
-        normalized=re.sub(r"\s+"," ",normalized)
-        if normalized and normalized!=last:
-            lines.append(normalized);last=normalized
+        cue_lines.append(line)
+    finish_cue()
     if not lines or latest<=0:hold("no timestamped caption text")
     return ("\n".join(lines)+"\n").encode("utf-8"),{
         "source_cue_count":cues,
