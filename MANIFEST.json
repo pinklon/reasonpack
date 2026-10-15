@@ -104,8 +104,8 @@
     },
     {
       "path": "docs/DIRECT_REMUX_SOURCE_CAPTURE_V19.md",
-      "bytes": 4816,
-      "sha256": "7e773e92b33028d81f88fc636abbf9c50ef1363d276de05b4e4826de0fb4e9cd"
+      "bytes": 5395,
+      "sha256": "7db3a792d6a6e198c000a98dbf46a2b787bd3c397414c83e3121cdad66fa5e30"
     },
     {
       "path": "docs/DOCUMENTATION_MAP.md",
@@ -269,8 +269,8 @@
     },
     {
       "path": "ops/direct-remux-pack.py",
-      "bytes": 12321,
-      "sha256": "355fed8adbdb5967c95f651fadffd93ad563688888b1f74b0ef23014a6be0d6e"
+      "bytes": 13125,
+      "sha256": "a60a3d4cb890c54980968c2c5f79dfdaf86e067d3f887348c21d7b9f1c88d657"
     },
     {
       "path": "presentation/reasonpack-vision-poster.png",

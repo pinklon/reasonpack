@@ -158,6 +158,28 @@ class DirectPackTests(unittest.TestCase):
                if c[0]=="yt-dlp" and "--sub-langs" in c]
         self.assertEqual(langs,["en-orig","en"])
 
+    def test_repeated_speech_after_a_pause_is_preserved(self):
+        spoken=(b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nNo\n\n"
+                b"00:00:10.000 --> 00:00:11.000\nNo new taxes\n")
+        text,_=M.timed_vtt(spoken)
+        self.assertEqual(text,b"No\nNo new taxes\n")
+
+    def test_corrupt_preferred_caption_falls_back_to_valid_english(self):
+        def runner(argv,*,stdout=None):
+            self.fake_run(argv,stdout=stdout)
+            if ("--sub-langs" in argv and
+                argv[argv.index("--sub-langs")+1]=="en-orig"):
+                template=Path(argv[argv.index("-o")+1])
+                template.with_name("captions.en-orig.vtt").write_bytes(
+                    b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\ntruncated\n")
+        got=M.build(URL,self.tmp/"verified-fallback",run=runner,
+                    probe_media=self.fake_probe)
+        self.assertEqual(got["status"],"canonical-direct-remux-verified")
+        self.assertEqual((self.tmp/"verified-fallback/captions.vtt").read_bytes(),VTT)
+        langs=[c[c.index("--sub-langs")+1] for c in self.calls
+               if c[0]=="yt-dlp" and "--sub-langs" in c]
+        self.assertEqual(langs,["en-orig","en"])
+
     def test_rolling_caption_overlap_is_removed_without_dropping_new_words(self):
         cues=(b"WEBVTT\n\n00:00:00.000 --> 00:00:03.000\n"
               b"I have used Gemini\n\n"

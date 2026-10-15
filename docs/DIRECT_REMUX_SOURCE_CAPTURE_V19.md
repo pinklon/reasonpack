@@ -37,3 +37,7 @@ Accept source English tracks in order en-orig, en, then en-US/en-GB/en-* regiona
 ## Rolling-caption normalization
 
 The original VTT remains captured verbatim. The normalized transcript groups payload by WebVTT cue and removes the longest previously spoken word overlap, both within one rolling cue and across successive cues, retaining only novel words. It does not treat caption cue IDs as spoken text. Timestamp coverage uses the maximum cue endpoint, which accepts valid overlapping cues, and both MM:SS.mmm and HH:MM:SS.mmm timestamp forms. This heuristic is for readable search/reasoning text, not an independently verified verbatim transcription; disputed quotes must be checked against the source audio or VTT.
+
+## Conservative transcript fidelity and fallback
+
+Repeated words after a gap are preserved: only overlapping sequences of at least two words in simultaneous or nearly adjacent caption cues are removed. This deliberately prefers retaining ambiguous repetitions over deleting real speech. An English caption track is accepted only after WebVTT parsing, timestamp checks and near-end coverage pass; unusable en-orig tracks trigger an independent attempt using en or a regional variant. The exact original selected VTT is preserved and remains authoritative for quote verification.

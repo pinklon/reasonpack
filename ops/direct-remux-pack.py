@@ -93,31 +93,39 @@ def timed_vtt(raw):
         hold("caption file missing or oversized")
     text=raw.decode("utf-8-sig",errors="replace")
     if not text.lstrip().startswith("WEBVTT"):hold("caption payload not WebVTT")
-    lines=[]; latest=-1.0; previous_start=-1.0; cues=0
-    spoken=[]
+    lines=[]; latest=-1.0; previous_start=-1.0; previous_end=-1.0; cues=0
+    spoken=[]; cue_start=-1.0; cue_end=-1.0
     cue_lines=[]
 
     def remove_rolling_overlap(previous,incoming):
         # A later automatic caption may include repeated context from earlier
         # cues. Preserve only the new suffix; original VTT remains unmodified.
         length=min(len(previous),len(incoming),256)
-        for size in range(length,0,-1):
+        # One-word overlaps are too ambiguous: they may be intentional
+        # repetitions rather than automatic-caption context.
+        for size in range(length,1,-1):
             if previous[-size:]==incoming[:size]:
                 return incoming[size:]
         return incoming
 
     def finish_cue():
-        nonlocal cue_lines
-        if not cue_lines:return
+        nonlocal cue_lines,previous_end
+        if not cue_lines:
+            previous_end=max(previous_end,cue_end)
+            return
         current=[]
         for line in cue_lines:
             clean=unescape(re.sub(r"<[^>]*>","",line)).strip()
             words=re.sub(r"\s+"," ",clean).split()
             if words:current.extend(remove_rolling_overlap(current,words))
-        fresh=remove_rolling_overlap(spoken,current)
+        # Remove repeated rolling context only when cues overlap or are
+        # nearly adjacent. Speech after a pause must NOT lose a repeated word.
+        adjacent=(previous_end>=0 and cue_start<=previous_end+1.0)
+        fresh=remove_rolling_overlap(spoken,current) if adjacent else current
         if fresh:
             spoken.extend(fresh)
             lines.append(" ".join(fresh))
+        previous_end=max(previous_end,cue_end)
         cue_lines=[]
 
     rows=text.splitlines()
@@ -131,6 +139,8 @@ def timed_vtt(raw):
             if start<0 or endpoint<start or (previous_start>=0 and start<previous_start):
                 hold("out-of-order or invalid caption cue timing")
             previous_start=start
+            cue_start=start
+            cue_end=endpoint
             # WebVTT cues may overlap. Coverage is the furthest endpoint,
             # not the end of the last cue in presentation order.
             latest=max(latest,endpoint)
@@ -209,6 +219,8 @@ def build(url,target,*,run=invoke,probe_media=probe):
         if catalog:
             languages=[x for x in languages if x in catalog]
         chosen=None
+        transcript=None
+        captions=None
         for language in languages:
             # One language at a time: failure of an unused translation cannot
             # invalidate an already available original English caption.
@@ -221,16 +233,20 @@ def build(url,target,*,run=invoke,probe_media=probe):
                 continue
             candidate=stage/("captions."+language+".vtt")
             if candidate.is_file() and not candidate.is_symlink():
+                try:
+                    text,coverage=timed_vtt(candidate.read_bytes())
+                    if coverage["last_caption_second"]<media["duration_seconds"]-max(25,media["duration_seconds"]*0.02):
+                        continue
+                except (ValueError,OSError,UnicodeError):
+                    continue
                 chosen=candidate
+                transcript,captions=text,coverage
                 break
-        if chosen is None:hold("no usable English captions; transcription required")
+        if chosen is None:hold("no usable full-length English captions; transcription required")
         os.replace(chosen,stage/"captions.vtt")
         for extra in stage.glob("captions.*.vtt"):
             if extra.exists():extra.unlink()
-        transcript,captions=timed_vtt((stage/"captions.vtt").read_bytes())
         (stage/"transcript.txt").write_bytes(transcript)
-        if captions["last_caption_second"]<media["duration_seconds"]-max(25,media["duration_seconds"]*0.02):
-            hold("source caption coverage incomplete")
         write_json(stage/"transcript-status.json",
             {"status":"source-captions","sourceFile":"captions.vtt",
              "caption_line_count":captions["source_line_count"],
