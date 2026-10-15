@@ -85,6 +85,26 @@ def verify_install_contract(unit_text):
             "total_duration_limit":None,
             "network_acquisition_performed":False}
 
+def verify_primary_runner(job_id,*,run=subprocess.run):
+    """Only systemd's own MainPID may spend this unit's root-owned permit.
+
+    A worker process in the same cgroup cannot become the original ExecStart
+    PID and therefore cannot launch a second acquisition via a nested runner.
+    """
+    unit=verify_containment(job_id)
+    try:
+        result=run(["/usr/bin/systemctl","show",unit,"-p","MainPID","--value",
+                    "--no-pager"],
+                   stdin=subprocess.DEVNULL,capture_output=True,text=True,
+                   timeout=6,env={"PATH":"/usr/bin:/bin","LC_ALL":"C"})
+    except (OSError,subprocess.SubprocessError):
+        refuse("systemd main PID readback unavailable")
+    if result.returncode!=0 or not result.stdout.strip().isdigit():
+        refuse("systemd main PID readback not authoritative")
+    if int(result.stdout.strip())!=os.getpid() or os.getpid()<=1:
+        refuse("only systemd registered primary runner may launch acquisition")
+    return {"unit":unit,"main_pid":os.getpid(),"readback":"systemd-mainpid"}
+
 def jobdir_for(job_id):
     verify_containment(job_id)
     root=JOBS
@@ -99,7 +119,7 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
     Systemd owns *this parent unit* and all subprocess descendants; the cgroup
     stops as one boundary even if worker or backend starts a new session.
     """
-    verify_containment(job_id)
+    verify_primary_runner(job_id)
     guard=guard or imported("acquisition-supervisor")
     backend=backend or imported("acquisition-real-worker")
     job=JOBS/job_id

@@ -130,6 +130,8 @@ class OwnerPrestartTests(unittest.TestCase):
         self.assertIn("owner.verified_owner_permit(approved)",c)
         self.assertLess(c.index("owner.verified_owner_permit(approved)"),
                         c.index("backend.preflight()"))
+        self.assertLess(c.index("verify_primary_runner(job_id)"),
+                        c.index("owner.verified_owner_permit(approved)"))
         rootcmd=(ROOT/"ops/acquisition-owner-prestart.py").read_text()
         self.assertNotIn("subprocess.Popen(",rootcmd)
         self.assertNotIn("launch-real",rootcmd)
