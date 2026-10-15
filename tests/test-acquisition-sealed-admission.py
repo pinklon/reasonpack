@@ -72,6 +72,19 @@ print("CHILD_SEALED_READ_OK")
                         parent.index("handoff.seal_admission(raw_admission)"))
         self.assertLess(parent.index("handoff.seal_admission(raw_admission)"),
                         parent.index("os.write(wfd,b"+'"G"'+")"))
+    def test_supervision_json_state_uses_actual_newline(self):
+        # The parent writes twice: launch intent and running state. Both
+        # receipts MUST be parseable JSON, not JSON followed by literal \\n.
+        import ast
+        src=(ROOT/"ops/acquisition-cgroup-runner.py").read_text()
+        constants=[n.value for n in ast.walk(ast.parse(src))
+                   if isinstance(n,ast.Constant) and isinstance(n.value,str)]
+        self.assertGreaterEqual(constants.count("\n"),2)
+        self.assertNotIn("\\n",constants)
+        record={"status":"running","job_id":"a"*64}
+        original=(json.dumps(record,sort_keys=True,indent=2)+"\n").encode()
+        self.assertEqual(json.loads(original),record)
+
     def test_refuse_empty_or_oversized_snapshot(self):
         for raw in (b"",b"a"*(M.MAX_BYTES+1)):
             with self.assertRaises(ValueError):

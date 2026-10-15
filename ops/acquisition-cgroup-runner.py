@@ -151,7 +151,7 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
                              worker_start_ticks=birth,worker_command_verified=True,
                              last_observation="contained source worker running, source unverified")
                 guard.atomic(job/"supervision.json",
-                             (json.dumps(state,sort_keys=True,indent=2)+"\\n").encode(),replace=True)
+                             (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
                 os.write(wfd,b"G")
             finally:
                 os.close(rfd)

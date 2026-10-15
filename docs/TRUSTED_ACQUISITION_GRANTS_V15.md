@@ -111,3 +111,12 @@ UTC at test execution and preserves explicit offset-aware expiry controls.
 seals, cross-subprocess read-only transfer, forged on-disk video replacement,
 unsealed/pipe rejection and exact parent-child source binding. This does not
 authorize any real acquisition until an independent Gmail signer is trusted.
+
+## Running-state JSON correction
+
+Second independent read-only review found a P1 escaped-newline mistake in
+the supervised running-state write. It appended a literal backslash-n after
+the JSON, so the worker would reject the state's extra trailing bytes before
+acquisition. The source now emits an actual newline in both durable state
+writes. An AST-level regression verifies no stray literal backslash-n
+constants are present and that the status receipt remains valid JSON.
