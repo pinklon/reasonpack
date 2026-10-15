@@ -126,6 +126,20 @@ def check_root_public_signer_custody(path=TRUST):
         reject("owner signer identity or public algorithm not explicitly pinned")
     return True
 
+def verify_from_bytes(grant_raw,signature,admission,supervision,release_commit):
+    """Verify byte snapshots, independent of an untrusted filesystem pathname."""
+    check_root_public_signer_custody()
+    if not isinstance(grant_raw,bytes) or len(grant_raw)>MAX_BYTES:
+        reject("grant source exceeds exact maximum")
+    if not isinstance(signature,bytes) or len(signature)>MAX_SIGNATURE_BYTES:
+        reject("owner grant signature exceeds exact maximum")
+    record=validate_payload(grant_raw,admission_raw=admission,
+                            supervision=supervision,release_commit=release_commit)
+    verify_file_signature(grant_raw,signature,TRUST)
+    record["launch_authorized"]=True
+    record["signature_method"]="openssh-ed25519-external-owner-signer"
+    return record
+
 def verify_for_job(job,admission,supervision,release_commit):
     """Fail-closed real worker entrypoint; never creates or reads private keys."""
     if job.is_symlink() or not job.is_dir():

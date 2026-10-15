@@ -163,6 +163,18 @@ class OwnerGrantTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"signature invalid"):
                 M.verify_for_job(job,self.admission_raw,self.supervision,RELEASE)
 
+    def test_root_verification_uses_exact_pinned_bytes(self):
+        raw=self.raw()
+        sig=self.sign(raw)
+        with mock.patch.object(M,"TRUST",self.allowed),mock.patch.object(
+                M,"check_root_public_signer_custody",return_value=True):
+            result=M.verify_from_bytes(raw,sig,self.admission_raw,
+                                       self.supervision,RELEASE)
+            self.assertTrue(result["launch_authorized"])
+            with self.assertRaisesRegex(ValueError,"signature invalid"):
+                M.verify_from_bytes(self.raw(dict(self.data,nonce="f"*64)),
+                                    sig,self.admission_raw,self.supervision,RELEASE)
+
     def test_production_method_refuses_untrusted_signers(self):
         job=self.root/JOB
         job.mkdir()
