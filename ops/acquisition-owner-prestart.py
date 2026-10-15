@@ -188,20 +188,29 @@ def prestart(job_id):
     release_commit=REPO.name
     if not HEX40.fullmatch(release_commit):refuse("unreviewed immutable release")
     check_ledger_custody()
-    job=JOBS/job_id
-    if job.is_symlink() or not job.is_dir():refuse("registered owner job missing")
     guard=imp("acquisition-supervisor")
     signed=imp("acquisition-signed-grant")
-    # NEVER use guard.lock(job) as root: that lock would be root:root
-    # mode 0600 in the worker-owned directory, deadlocking the later
-    # non-root runner. Owner's transaction is serialized by SQLite.
-    state=guard.state(job)
-    if (state.get("job_id")!=job_id or state.get("status")!="registered"
-        or state.get("attempts")!=0):
-        refuse("job already attempted or not registered")
-    admission=(job/"admission.json").read_bytes()
-    record=signed.verify_for_job(job,admission,state,release_commit)
-    result=claim_once(record,db=DB,permitdir=PERMITS)
+    safe=imp("acquisition-safe-owner-io")
+    # Pin the exact job directory and open only bounded regular members via
+    # O_NOFOLLOW, O_NONBLOCK, dir_fd and fstat. Root must never perform the
+    # worker's prior pathname-based verification routines.
+    with safe.opened_job(job_id) as jobfd:
+        admission=safe.read_regular_member(jobfd,"admission.json",40_000)
+        raw_state=safe.read_regular_member(jobfd,"supervision.json",65_536)
+        raw_grant=safe.read_regular_member(jobfd,"launch-grant.json",8_192)
+        signature=safe.read_regular_member(jobfd,"launch-grant.sig",4_096)
+        source=guard.validate_admission(admission)
+        state=json.loads(raw_state)
+        if not isinstance(state,dict):
+            refuse("signed job state not an object")
+        if (source.get("job_id")!=job_id or state.get("schema")!=guard.SCHEMA
+            or state.get("job_id")!=job_id
+            or state.get("admission_sha256")!=guard.hashraw(admission)
+            or state.get("status")!="registered" or state.get("attempts")!=0):
+            refuse("job already attempted or unbound registered state")
+        record=signed.verify_from_bytes(raw_grant,signature,admission,
+                                        state,release_commit)
+        result=claim_once(record,db=DB,permitdir=PERMITS)
     return {"job_id":job_id,"grant_sha256":result["grant_sha256"],
         "owner_claim_consumed":True,"worker_started":False,
         "network_acquisition_performed":False}
