@@ -109,11 +109,11 @@ def safe_write(path,raw):
 def prepare(args):
     packet,registry,identity=inputs(args.packet,args.registry)
     if args.out.exists():refuse("composition directory already exists")
-    args.out.mkdir(parents=True,mode=0o700)
     schema_raw=(json.dumps(schema(),indent=2)+"\n").encode()
     prompt_raw=prompt(packet,registry,identity).encode("utf-8")
     if len(prompt_raw)>180_000:
         refuse("composed reasoning prompt exceeds 180 KB; segment source context")
+    args.out.mkdir(parents=True,mode=0o700)
     safe_write(args.out/"analysis-schema.json",schema_raw)
     safe_write(args.out/"model-prompt.json",prompt_raw)
     receipt={"schema":SCHEMA,"status":"model-input-ready-not-invoked","source_video_id":identity["video_id"],

@@ -182,6 +182,22 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(self.cli("reader-pipeline.py","analysis","--job",job,"--analysis",self.analysis).returncode,2)
         self.assertEqual(json.loads((job/"workflow.json").read_text())["state"],"research-evidence-verified")
 
+    def test_corrected_bad_analysis_can_be_retried_before_receipt(self):
+        job=self.init()
+        self.progress(job,"source","--pack",self.pack)
+        self.progress(job,"research")
+        self.progress(job,"evidence","--registry",self.evidence_for(job))
+        self.progress(job,"compose")
+        good=self.analysis.read_text()
+        bad=json.loads(good)
+        bad["claims"][0]["verdict"]="supported"
+        bad["claims"][0]["sources"]=[{"label":"Unregistered","url":"https://example.com/missing"}]
+        self.analysis.write_text(json.dumps(bad))
+        self.assertEqual(self.cli("reader-pipeline.py","analysis","--job",job,"--analysis",self.analysis).returncode,2)
+        self.assertFalse((job/"research-validation-receipt.json").exists())
+        self.analysis.write_text(good)
+        self.assertEqual(self.progress(job,"analysis","--analysis",self.analysis)["state"],"analysis-unreviewed")
+
     def test_duplicate_idempotency_and_mutated_request_rejected(self):
         job=self.init()
         rec=next(self.jobs.rglob("*.json"))

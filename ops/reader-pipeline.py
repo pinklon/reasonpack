@@ -245,23 +245,24 @@ def ingest_analysis(args):
                 or composition.get("model_schema_sha256")!=digest((args.job/"composition"/"analysis-schema.json").read_bytes())):
             reject("prepared model context has changed")
         raw = args.analysis.read_bytes()
+        if len(raw)>400_000:
+            reject("analysis too large")
+        analysis=json.loads(raw)
+        mod=import_script("reader-edition")
+        mod.load_analysis(args.analysis)
+        if analysis.get("video_id") != flow["video_id"]:
+            reject("wrong video in analysis")
+        research = import_script("research-evidence")
+        corroboration = research.assert_supported_claims(analysis, research.verified_register(registry, args.job / "research-input.json"))
         validation_path=args.job/"research-validation-receipt.json"
         execute([sys.executable,str(ROOT/"ops/research-composer.py"),"validate",
                  "--packet",str(args.job/"research-input.json"),
                  "--registry",str(registry),
                  "--candidate",str(args.analysis),
                  "--out",str(validation_path)])
-        if data(validation_path).get("semantic_review")!="NOT_ATTESTED":
-            reject("machine-generated research cannot self-attest")
-        if len(raw)>400_000:
-            reject("analysis too large")
-        analysis=json.loads(raw)
-        mod=import_script("reader-edition")
-        mod.load_analysis(args.analysis)
-        research = import_script("research-evidence")
-        corroboration = research.assert_supported_claims(analysis, research.verified_register(registry, args.job / "research-input.json"))
-        if analysis.get("video_id") != flow["video_id"]:
-            reject("wrong video in analysis")
+        if (data(validation_path).get("semantic_review")!="NOT_ATTESTED" or
+                data(validation_path).get("candidate_sha256")!=digest(raw)):
+            reject("machine-generated research cannot self-attest or modify source")
         # Provenance is not equivalent to editorial verification; HOLD is retained.
         protect_write(args.job / "analysis-unreviewed.json", raw)
         return advance(args.job, flow, "analysis-unreviewed",
