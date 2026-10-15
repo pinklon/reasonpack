@@ -20,7 +20,7 @@ import tempfile
 import time
 
 REPO=Path(__file__).resolve().parents[1]
-CLI=Path("/home/ghostmesh/.local/share/reasonpack/reasonpack")
+CLI=REPO/"bin/reasonpack"
 PIN="2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1"
 SCHEMA="ghostmesh.reasonpack.acquisition-real-backend.v1"
 
@@ -57,7 +57,7 @@ def atomic(path,obj):
 def preflight(cli=CLI,pin=PIN):
     if cli.is_symlink() or not cli.is_file():deny("fixed ReasonPack implementation unavailable")
     observed=digest(cli)
-    if observed!=pin:deny("installed acquisition CLI drift; source must be reviewed")
+    if observed!=pin:deny("reviewed release acquisition CLI drift; source must be requalified")
     return {"backend":str(cli),"sha256":observed,
             "command_mode":"reasonpack build CANONICAL_URL DEDICATED_EMPTY_DIR",
             "network_acquisition_performed":False}
