@@ -29,7 +29,7 @@ NODEID=re.compile(r"^level-\d{3}-node-\d{6}$")
 def hold(reason): raise ValueError(reason)
 def hashbytes(raw):return sha256(raw).hexdigest()
 def jd(raw):return json.loads(raw)
-def payload(obj):return (json.dumps(obj,sort_keys=True,ensure_ascii=True,separators=(",",":"))+"\n").encode()
+def payload(obj):return (json.dumps(obj,sort_keys=True,ensure_ascii=False,separators=(",",":"))+"\n").encode("utf-8")
 def private_write(path,raw):
     if path.exists() or path.is_symlink(): hold("immutable output already exists")
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)

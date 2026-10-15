@@ -37,3 +37,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 tests/test-reader-pipeline.py
 Fixtures prove a multi-level reduction tree, absence of missing leaf segments, exact-root coverage, altered prompt/leaf/node rejection, out-of-order preparation refusal, idempotent replay and output authority denial. Test code does NOT invoke a real model or claim scientifically valid synthesized conclusions.
 
 **Rollback:** discard source worktree/branch. Running GhostMesh Gmail and ReasonPack services are unchanged.
+
+## Independent review repair
+
+The first independent review of this source candidate found a P2 Unicode boundary: ASCII-escaped JSON could turn a pair of otherwise valid supplementary-Unicode segment results into a synthesis node larger than the single-invocation prompt budget. We now serialize synthesis model prompts as exact UTF-8 rather than ASCII escapes, and test the maximum valid two-child 12-by-1,000 Unicode observations. This maintains the per-call budget without imposing a whole-video duration limit.

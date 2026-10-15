@@ -224,6 +224,21 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(receipt["all_segment_coverage_sha256"],
             hashlib.sha256((self.synth/"coverage-receipt.json").read_bytes()).hexdigest())
 
+    def test_valid_large_unicode_segment_observations_fit_prompt(self):
+        for i in (0,1):
+            path=self.results/f"segment-{i:06d}.json"
+            candidate=json.loads(path.read_text())
+            candidate["observations"]=["💠"*1000 for _ in range(12)]
+            path.write_text(json.dumps(candidate))
+        self.init()
+        ready=self.call("prepare","--node","level-001-node-000000")
+        self.assertEqual(ready.returncode,0,ready.stderr)
+        prompt=self.synth/"prompts/level-001-node-000000.json"
+        self.assertLess(prompt.stat().st_size,180_000)
+        source=json.loads(prompt.read_text("utf-8"))
+        self.assertEqual(source["children"][0]["observations"][0],"💠"*1000)
+        self.assertEqual(source["children"][1]["observations"][0],"💠"*1000)
+
     def test_prompts_bound_to_original_source_identity(self):
         self.init()
         p=self.call("prepare","--node","level-001-node-000000")
