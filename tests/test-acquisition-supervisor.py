@@ -82,6 +82,34 @@ class DurableTests(unittest.TestCase):
             if last in statuses:return result
             time.sleep(.05)
         self.fail("status did not reach "+str(statuses)+" last="+str(last))
+    def test_zombie_pid_never_counts_as_running(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location("supervisor_zombie_test",
+              ROOT/"ops/acquisition-supervisor.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for status in ("Z","X","x"):
+            fake="123 (fixture name) "+status+" "+" ".join(["0"]*18+["381299"])
+            self.assertIsNone(module.parse_proc_identity(fake))
+        running="123 (fixture name) S "+" ".join(["0"]*18+["381299"])
+        self.assertEqual(module.parse_proc_identity(running),381299)
+
+    def test_interrupted_registration_can_be_retried_without_partial_job(self):
+        from unittest import mock
+        import importlib.util
+        spec=importlib.util.spec_from_file_location("supervisor_atomic_test",
+              ROOT/"ops/acquisition-supervisor.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with mock.patch.dict(os.environ,{"REASONPACK_MAIL_INGEST_KEY":KEY.decode()}):
+            with mock.patch.object(module.os,"rename",side_effect=OSError("synthetic interrupted registration")):
+                with self.assertRaisesRegex(OSError,"interrupted registration"):
+                    module.register(self.input,self.jobs,self.envelope,[SENDER])
+        self.assertFalse(self.job.exists())
+        self.assertEqual(list(self.jobs.glob(".register-acquisition-*")),[])
+        self.assertEqual(self.register().returncode,0)
+        self.assertEqual(self.observe()["status"],"registered-no-worker")
+
     def test_admission_idempotent_and_private(self):
         self.assertEqual(self.register().returncode,0)
         self.assertEqual(json.loads(self.register().stdout)["status"],"already-registered")

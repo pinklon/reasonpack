@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import shutil
 import tempfile
 from urllib.parse import urlsplit, parse_qs
 
@@ -118,18 +119,26 @@ def register(receipt,root,envelope,allowed):
             load(path/"supervision.json").get("signed_gateway_sha256")!=signed_gateway_sha):
             fail("same job identity has conflicting verified source")
         return {"status":"already-registered","job":str(path)}
-    path.mkdir(mode=0o700)
-    atomic(path/"admission.json",raw)
-    record={"schema":SCHEMA,"job_id":a["job_id"],"admission_sha256":hashraw(raw),
-            "signed_gateway_sha256":signed_gateway_sha,
-            "video_id":a["video_id"],"status":"registered",
-            "worker_kind":"none","worker_pid":None,"worker_start_ticks":None,
-            "worker_command_verified":False,"attempts":0,
-            "work_started_at":None,"last_progress_at":None,
-            "mission_elapsed_cutoff":None,
-            "last_observation":"no worker has been started",
-            "model_invoked":False,"email_dispatched":False,"public_release":False}
-    atomic(path/"supervision.json",(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+    staging=Path(tempfile.mkdtemp(prefix=".register-acquisition-",dir=root))
+    try:
+        atomic(staging/"admission.json",raw)
+        record={"schema":SCHEMA,"job_id":a["job_id"],"admission_sha256":hashraw(raw),
+                "signed_gateway_sha256":signed_gateway_sha,
+                "video_id":a["video_id"],"status":"registered",
+                "worker_kind":"none","worker_pid":None,"worker_start_ticks":None,
+                "worker_command_verified":False,"attempts":0,
+                "work_started_at":None,"last_progress_at":None,
+                "mission_elapsed_cutoff":None,
+                "last_observation":"no worker has been started",
+                "model_invoked":False,"email_dispatched":False,"public_release":False}
+        atomic(staging/"supervision.json",(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+        if path.exists():fail("job appeared during registration; retry readback")
+        os.rename(staging,path)
+        root_fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY)
+        try:os.fsync(root_fd)
+        finally:os.close(root_fd)
+    finally:
+        if staging.exists():shutil.rmtree(staging)
     return {"status":"registered","job":str(path)}
 
 def state(path):
@@ -139,13 +148,18 @@ def state(path):
         fail("supervision receipt identity drift")
     return s
 
+def parse_proc_identity(raw):
+    # /proc/[pid]/stat: field 3 is process state, field 22 is start ticks.
+    # Zombie state retains PID/ticks despite having already exited.
+    tail=raw.rsplit(")",1)[1].split()
+    if tail[0] in {"Z","X","x"}:
+        return None
+    return int(tail[19])
+
 def startticks(pid):
-    if not isinstance(pid,int) or pid<=1: return None
+    if not isinstance(pid,int) or pid<=1:return None
     try:
-        raw=Path(f"/proc/{pid}/stat").read_text()
-        # fields 3.. are after the final closing parenthesis (comm may include spaces)
-        tail=raw.rsplit(")",1)[1].split()
-        return int(tail[19])
+        return parse_proc_identity(Path(f"/proc/{pid}/stat").read_text())
     except (ValueError,OSError,IndexError):return None
 
 def live(s):

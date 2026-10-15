@@ -51,3 +51,11 @@ The progress file is explicitly **worker-self-report, not independent witness ev
 `python3 tests/test-acquisition-supervisor.py` executes a real synthetic child process and separately invoked supervisor commands. Positive and adversarial tests cover signed envelope binding, source substitution, privilege forgery, idempotency, fresh-launch gating, process identity, restart-readback, self-reported progress, clean completion, loss of a worker with UNKNOWN/reconciliation and refusal of automatic repeat dispatch.
 
 No live email, Slack message, YouTube download, model call, payment, public Reader or Production mutation is made by these tests.
+
+## Independent review hardening
+
+Initial independent read-only review of this implementation found two P2 defects. A zombie could retain the same \`/proc/PID/stat\` start ticks after exit, and a crash between directory creation and the two registration writes could leave an unrecoverable partial job. Both are repaired before review promotion.
+
+The supervisor now checks process state alongside PID/start ticks, excluding Z/X/x. Registration builds both private exact receipts in a sibling directory, fsyncs them, atomically renames into the canonical job name, then fsyncs the queue directory; crash before publication leaves no partial canonical job. Focused regressions cover zombies and interruption before publication, with successful retry after the simulated failure.
+
+The worker's heartbeat and terminal marker remain **self-reported synthetic evidence**, not independent provider or acquisition attestation.
