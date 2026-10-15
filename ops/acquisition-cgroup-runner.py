@@ -128,28 +128,37 @@ def execute(job_id,*,guard=None,backend=None,child_runner=subprocess.Popen):
                      (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
         worker=REPO/"ops/acquisition-real-worker.py"
         if worker.is_symlink() or not worker.is_file():refuse("fixed real worker missing")
-        rfd,wfd=os.pipe()
-        proc=None
+        # Signed byte snapshot is passed on a sealed kernel memfd. Even if
+        # the worker-writable admission file changes after verification, the
+        # backend cannot consume a different video/source.
+        handoff=imported("acquisition-sealed-admission")
+        sealed_fd=handoff.seal_admission(raw_admission)
         try:
-            with open(job/"contained-worker.stdout","xb",buffering=0) as out,open(
-                 job/"contained-worker.stderr","xb",buffering=0) as err:
-                proc=child_runner([sys.executable,"-B",str(worker),
-                        "--job",str(job),"--gate-fd",str(rfd)],
-                     stdin=subprocess.DEVNULL,stdout=out,stderr=err,
-                     pass_fds=(rfd,),start_new_session=True,
-                     env={"PATH":"/usr/bin:/bin","LANG":"C.UTF-8"})
-            birth=guard.startticks(proc.pid)
-            if not isinstance(birth,int):refuse("child PID/start identity unavailable")
-            state.update(status="running",worker_pid=proc.pid,
-                         worker_start_ticks=birth,worker_command_verified=True,
-                         last_observation="contained source worker running, source unverified")
-            guard.atomic(job/"supervision.json",
-                         (json.dumps(state,sort_keys=True,indent=2)+"\n").encode(),replace=True)
-            os.write(wfd,b"G")
+            rfd,wfd=os.pipe()
+            proc=None
+            try:
+                with open(job/"contained-worker.stdout","xb",buffering=0) as out,open(
+                     job/"contained-worker.stderr","xb",buffering=0) as err:
+                    proc=child_runner([sys.executable,"-B",str(worker),
+                            "--job",str(job),"--gate-fd",str(rfd),
+                            "--admission-fd",str(sealed_fd)],
+                         stdin=subprocess.DEVNULL,stdout=out,stderr=err,
+                         pass_fds=(rfd,sealed_fd),start_new_session=True,
+                         env={"PATH":"/usr/bin:/bin","LANG":"C.UTF-8"})
+                birth=guard.startticks(proc.pid)
+                if not isinstance(birth,int):refuse("child PID/start identity unavailable")
+                state.update(status="running",worker_pid=proc.pid,
+                             worker_start_ticks=birth,worker_command_verified=True,
+                             last_observation="contained source worker running, source unverified")
+                guard.atomic(job/"supervision.json",
+                             (json.dumps(state,sort_keys=True,indent=2)+"\\n").encode(),replace=True)
+                os.write(wfd,b"G")
+            finally:
+                os.close(rfd)
+                os.close(wfd)
+            rc=proc.wait()
         finally:
-            os.close(rfd)
-            os.close(wfd)
-        rc=proc.wait()
+            os.close(sealed_fd)
         # The only positive outcome is an independent re-verification
         # of the complete pack. A worker's exit code alone proves nothing.
         result=guard.observe(job)

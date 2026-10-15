@@ -89,3 +89,25 @@ implies a real trusted Gmail signer exists or that it was authorized.
 
 No repeated global wall-clock limit for multi-hour videos, second Gmail
 poller, credential export, public publishing, or customer billing is authorized.
+
+## Race-free worker handoff
+
+Independent review of the first source commit found a P1 time-of-check/time-of-use
+hole: after signature verification, the worker reread the original
+worker-writable admission from disk. An attacker could replace the video
+between those two reads. The parent now places the exact verified admission
+bytes in a kernel anonymous \`memfd\`, applies irreversible
+\`F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL\`, and transfers
+that descriptor to the child via \`pass_fds\`. The child checks its seals,
+size, authenticated job identifier, then uses only that snapshot for choosing
+the video/source URL. The disk record is *never* reread as source authority.
+Neither the parent nor child can mutate the sealed byte stream.
+
+A read-only reviewer also identified a fixed October 15 timestamp in
+a signature test that would break future hosted CI. The fixture now uses
+UTC at test execution and preserves explicit offset-aware expiry controls.
+
+\`tests/test-acquisition-sealed-admission.py\` verifies live Linux memfd
+seals, cross-subprocess read-only transfer, forged on-disk video replacement,
+unsealed/pipe rejection and exact parent-child source binding. This does not
+authorize any real acquisition until an independent Gmail signer is trusted.

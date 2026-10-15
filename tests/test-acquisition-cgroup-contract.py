@@ -43,7 +43,7 @@ class ContainmentTests(unittest.TestCase):
                 C.verify_containment(name,"/system.slice/ghostmesh-reasonpack-acquire@"+name+".service")
     def test_direct_real_worker_executable_cannot_bypass_cgroup(self):
         result=subprocess.run([sys.executable,str(ROOT/"ops/acquisition-real-worker.py"),
-             "--job",str(C.JOBS/IDENT),"--gate-fd","0"],
+             "--job",str(C.JOBS/IDENT),"--gate-fd","0","--admission-fd","0"],
              input="",capture_output=True,text=True,timeout=5)
         self.assertEqual(result.returncode,2)
         self.assertIn("exact approved systemd instance cgroup",result.stderr)

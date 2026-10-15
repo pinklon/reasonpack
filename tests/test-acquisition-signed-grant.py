@@ -55,7 +55,7 @@ class OwnerGrantTests(unittest.TestCase):
         self.admission_raw=(json.dumps(self.admission,sort_keys=True)+"\n").encode()
         self.supervision={"job_id":JOB,"admission_sha256":sha256(self.admission_raw).hexdigest(),
              "signed_gateway_sha256":SIGNED_GATEWAY,"status":"registered","attempts":0}
-        self.now=datetime(2026,10,15,20,0,tzinfo=timezone.utc)
+        self.now=datetime.now(timezone.utc).replace(microsecond=0)
         self.data={
           "schema":M.SCHEMA,"job_id":JOB,"source_url":SOURCE,"video_id":VID,
           "admission_sha256":sha256(self.admission_raw).hexdigest(),
