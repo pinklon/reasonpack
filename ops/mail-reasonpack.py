@@ -48,6 +48,15 @@ def validate_envelope(envelope, key: bytes, allowed_senders):
     sender = sender.lower()
     if sender not in allowed_senders:
         reject("sender not allowlisted")
+    gmail_id = envelope.get("gmail_id")
+    gmail_thread_id = envelope.get("gmail_thread_id")
+    if (gmail_id is None) != (gmail_thread_id is None):
+        reject("gmail source and thread must be paired")
+    if gmail_id is not None:
+        if not isinstance(gmail_id, str) or not re.fullmatch(r"[0-9a-f]{10,32}", gmail_id):
+            reject("invalid authenticated gmail source ID")
+        if not isinstance(gmail_thread_id, str) or not 0 < len(gmail_thread_id) < 256 or any(c in gmail_thread_id for c in "\r\n"):
+            reject("invalid authenticated gmail thread ID")
     message_id = envelope.get("message_id","")
     if not isinstance(message_id,str) or not MESSAGE_ID.fullmatch(message_id):
         reject("invalid message-id")
@@ -107,8 +116,14 @@ def admit(args):
         reject("empty authorized sender list")
     sender,message_id,subject,body=validate_envelope(json.loads(raw),key,allowed)
     vid,url=parse_intent(body)
-    job_id=sha256((sender+"\0"+message_id+"\0"+vid).encode()).hexdigest()
+    parsed_envelope = json.loads(raw)
+    job_id=sha256((sender+"\0"+str(parsed_envelope.get("gmail_id") or message_id)+"\0"+vid).encode()).hexdigest()
+    canonical_intent = {k:v for k,v in parsed_envelope.items() if k not in ("auth_tag", "issued_at_utc")}
+    intent_fingerprint = sha256(json.dumps(canonical_intent, sort_keys=True, separators=(",",":"), ensure_ascii=True).encode()).hexdigest()
+    input_envelope = parsed_envelope
     receipt={"schema":"ghostmesh.reasonpack.mail-job.v1","job_id":job_id,
+             "admission_intent_sha256":intent_fingerprint,
+             "gmail_id": input_envelope.get("gmail_id"), "gmail_thread_id": input_envelope.get("gmail_thread_id"),
              "sender":sender,"message_id":message_id,"subject":subject,"video_id":vid,
              "source_url":url,"status":"admitted-awaiting-acquisition",
              "admission_scope":"mail-gateway-signed-and-sender-allowlisted",
@@ -120,7 +135,8 @@ def admit(args):
         status="admitted"
     except FileExistsError:
         recorded=json.loads(path.read_text())
-        if recorded.get("job_id") != job_id or recorded.get("video_id") != vid:
+        if (recorded.get("job_id") != job_id or recorded.get("video_id") != vid
+                or recorded.get("admission_intent_sha256") != intent_fingerprint):
             reject("conflicting existing mail admission receipt")
         status="duplicate-ignored"
     print(json.dumps({"result":status,"job_id":job_id,"receipt_path":str(path)}))

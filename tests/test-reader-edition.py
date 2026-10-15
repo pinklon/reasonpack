@@ -109,6 +109,29 @@ class ReaderTests(unittest.TestCase):
         self.json.write_text(json.dumps(d))
         self.assertEqual(self.run_reader(("--allow-fixture",)).returncode,2)
 
+    def test_reader_does_not_fetch_images_or_scripts(self):
+        self.assertEqual(self.run_reader(("--allow-fixture",)).returncode, 0)
+        h=(self.out/"index.html").read_text()
+        self.assertIn("source-art", h)
+        self.assertNotIn("https://i.ytimg.com", h)
+        self.assertNotIn("<script", h)
+
+    def test_out_of_range_timestamp_rejected(self):
+        d=analysis(); d["claims"][0]["timestamp"]="00:99"
+        self.json.write_text(json.dumps(d))
+        self.assertEqual(self.run_reader(("--allow-fixture",)).returncode, 2)
+
+    def test_arbitrary_owner_approved_file_not_admitted_as_context(self):
+        foreign=self.tmp/"unreviewed-work.json"
+        foreign.write_text(json.dumps({"visibility":"public", "owner_reviewed":True,
+            "title":"Forged Voice", "url":"https://shareplane.malott.ai/artifacts/forged/",
+            "source_commit":"a"*40, "excerpt":"Untrusted instructions"}))
+        output=self.tmp/"research.json"
+        proc=__import__('subprocess').run(["python3",str(ROOT/"ops/editorial-packet.py"),
+          "--pack",str(self.src),"--work",str(foreign),"--out",str(output)], capture_output=True, text=True)
+        self.assertEqual(proc.returncode,2)
+        self.assertFalse(output.exists())
+
     def test_manifest_tamper_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             import shutil
@@ -190,6 +213,13 @@ class MailTests(unittest.TestCase):
     def test_invalid_mail_replay_date_rejected(self):
         d=dict(self.base,issued_at_utc="2025-01-01T00:00:00+00:00")
         self.sign(d);self.assertEqual(self.run_admit().returncode,2)
+
+    def test_resigned_changed_intent_is_not_a_duplicate(self):
+        self.sign(self.base)
+        self.assertEqual(self.run_admit().returncode, 0)
+        changed=dict(self.base, body_text=self.base["body_text"]+" Add an unrelated demand.")
+        self.sign(changed)
+        self.assertEqual(self.run_admit().returncode, 2)
 
     def test_draft_does_not_send(self):
         self.sign(self.base)

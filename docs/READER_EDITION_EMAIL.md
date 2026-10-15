@@ -84,3 +84,34 @@ The deployed GhostMesh mail package has the authenticated public email entrypoin
 The existing gm_intake.py is explicitly a correspondence-only owner verifier: operational mail admission is forbidden. Do not alter that invariant to enable ReasonPack. A future ReasonPack adapter belongs AFTER public mail verification and sender-policy admission and MUST preserve journal reservation, retry budget, thread identity, loop defenses and disclosure policy. It should sign a normalized bounded request for a new reasoned-content service, not grant deployment privileges. The same inbound message must not also trigger the ordinary response path while pending asynchronous analysis.
 
 Before integration, compare the specific source release used for the patch to live mail-current and independently verify exact-head tests. Do not edit or restart immutable live releases.
+
+## New v0.4 local orchestrator and gateway handoff
+
+- ops/reader-pipeline.py adds monotonic, receipt-backed, locked transitions: admitted → source-verified → awaiting-research → analysis-unreviewed → reader-private-draft → email-private-draft. It checks source hashes on every downstream transition, creates only local files, and never sends.
+- ops/mail-gateway-adapter.py is an import-only, owner-only canary helper. It may sign a verified Gmail envelope *only after* the live responder has independently authenticated and admitted the sender. It preserves Gmail message and thread IDs and does not authenticate any incoming email itself. Key access must remain restricted to that boundary.
+- Public owner-authored thesis context is restricted to versioned files committed under editorial/approved-works. Their source Git revision and source blob identity are carried as metadata. This does not make model-generated text author-approved. Public route reachability has not been verified; do not advertise any URL as accessible until probed.
+- CI now runs gateway-adapter and synthetic full-lifecycle tests. The synthetic pack is structurally hash-valid for testing but NOT an actual acquired YouTube video; production requires independent acquisition custody and live-source evidence.
+
+## Essential next boundary
+
+The deployed Gmail responder currently reserves each email in its durable journal, then produces one immediate model decision and may send a reply. A ReasonPack request must diverge **after authentication, policy admission, and journal reservation**, so the ordinary responder cannot also send. The asynchronous job needs an explicit durable claim and a separate qualified final-delivery path. Blindly dispatching a second reply against the same journal key risks duplicate or lost email. Do not activate this bridge until the exact-head mail release and independently reviewed tests prove that handoff.
+
+## Operator-only owner-canary runbook (NOT yet a live send)
+
+The mail gateway signer, installed reasoner and Gmail dispatcher have NOT been connected by this branch. An operator can exercise a previously admitted job without changing the live responder:
+
+```bash
+python3 ops/reader-pipeline.py init --admission /protected/verified-request-receipt.json --root /protected/reader-jobs
+python3 ops/reader-pipeline.py source --job /protected/reader-jobs/JOBID --pack /protected/verified-source-pack
+python3 ops/reader-pipeline.py research --job /protected/reader-jobs/JOBID
+# Research-input.json is untrusted source material. A separately authorized researcher must
+# evaluate the actual video and independent references and write analysis-v1.json.
+python3 ops/reader-pipeline.py analysis --job /protected/reader-jobs/JOBID --analysis /protected/analysis-v1.json
+python3 ops/reader-pipeline.py render --job /protected/reader-jobs/JOBID
+python3 ops/reader-pipeline.py draft --job /protected/reader-jobs/JOBID --from-email ghostmesh@malott.ai
+python3 ops/reader-pipeline.py status --job /protected/reader-jobs/JOBID
+```
+
+STOP at email-private-draft. Sending through the Gmail API is not supported by this feature and cannot be inferred from passing tests. Do not provide a public Reader URL or claim author signoff. The next deployment decision is a **separate** exact-head patch and independent review of the active Gmail responder, with its durable journal and reply state-machine behavior preserved.
+
+Rollback: discard the isolated worktree/branch or discontinue the canary job. The current Production releases, credentials, systemd units, and source packages remain untouched.

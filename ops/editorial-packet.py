@@ -58,25 +58,35 @@ def main():
         transcript=(args.pack/"transcript.txt").read_bytes()
         if len(transcript)>MAX_TRANSCRIPT_BYTES:
             fail("source transcript exceeds bounded context, requires segmented custody")
+        approved_dir=(repo/"editorial/approved-works").resolve()
+        approved_paths=sorted(approved_dir.glob("*.json"))
+        chosen=args.work if args.work else approved_paths
         works=[]
-        if len(args.work)>8:
+        if len(chosen)>8:
             fail("too many public Work sources")
-        for path in args.work:
+        for path in chosen:
+            path=path.resolve(strict=True)
+            if path.parent != approved_dir or path.is_symlink() or path not in approved_paths:
+                fail("public Work context is not in the approved source catalog")
             raw=path.read_bytes()
             if len(raw)>MAX_WORK_BYTES:
                 fail("supplied Work too large")
             doc=json.loads(raw)
-            if doc.get("visibility")!="public" or doc.get("owner_reviewed") is not True:
+            if doc.get("schema")!="ghostmesh.shareplane.public-context.v1" or doc.get("visibility")!="public" or doc.get("owner_reviewed") is not True:
                 fail("only explicitly owner-reviewed public Work excerpts permitted")
             if not isinstance(doc.get("title"),str) or not isinstance(doc.get("url"),str):
                 fail("invalid public Work identity")
             from urllib.parse import urlparse
             if urlparse(doc["url"]).scheme!="https" or urlparse(doc["url"]).hostname!="shareplane.malott.ai":
                 fail("noncanonical SharePlane Work URL")
-            if not isinstance(doc.get("source_commit"),str) or len(doc["source_commit"]) not in (40,64):
+            if (not isinstance(doc.get("source_commit"),str) or len(doc["source_commit"]) not in (40,64)
+                or not isinstance(doc.get("source_blob_sha"),str) or len(doc["source_blob_sha"])!=40
+                or not isinstance(doc.get("source_path"),str) or not doc["source_path"].startswith("content/artifacts/")) :
                 fail("Work requires exact pinned source commit")
             works.append({"title":doc["title"],"url":doc["url"],
-                          "source_commit":doc["source_commit"],"sha256":digest(raw),
+                          "source_commit":doc["source_commit"],"source_blob_sha":doc["source_blob_sha"],
+                          "source_path":doc["source_path"],"catalog_entry_sha256":digest(raw),
+                          "public_route_verified_live":False,
                           "excerpt":doc.get("excerpt","")[:16000]})
         packet={"schema":SCHEMA,"status":"awaiting-independent-research",
                 "source_url":manifest.get("sourceUrl"),"source_manifest_sha256":digest(manifest_raw),

@@ -57,6 +57,8 @@ def time_seconds(v):
     if not isinstance(v, str) or not TIME_RE.fullmatch(v):
         fail("invalid video timestamp")
     parts = [int(x) for x in v.split(":")]
+    if (len(parts)==2 and parts[1]>59) or (len(parts)==3 and (parts[1]>59 or parts[2]>59)):
+        fail("out-of-range video timestamp")
     return parts[0] * 60 + parts[1] if len(parts) == 2 else parts[0] * 3600 + parts[1] * 60 + parts[2]
 
 def sha_bytes(raw):
@@ -134,6 +136,11 @@ def a(url, label, css=""):
     return '<a rel="noopener noreferrer" target="_blank" class="' + css + '" href="' + esc(url) + '">' + esc(label) + '</a>'
 
 CSS = r"""
+.source-art{aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 70% 35%,#7b2b30,#2b1924 32%,#131820 70%);gap:10px;text-align:center;padding:22px}
+.source-art .play{font-size:44px;line-height:1;color:#fff;filter:drop-shadow(0 2px 14px #0008)}
+.source-art span{color:#fff;font-size:13px;font-weight:800;letter-spacing:.2em}
+.source-art small{font-size:12px;color:#ded5d6}
+
 :root{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#0b0d10;--panel:#15181e;--panel2:#1c2028;--fg:#f6f6f7;--muted:#aab1bd;--line:#353b44;--accent:#f45351;--good:#a9e0bc;--warn:#f2c779;color-scheme:dark}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);line-height:1.65}a{color:inherit;text-underline-offset:3px}a:hover{color:var(--accent)}
 .top{height:5px;background:linear-gradient(90deg,var(--accent) 0 25%,transparent 25%)}.wrap{width:min(1100px,calc(100% - 42px));margin:auto}
@@ -167,7 +174,7 @@ def render_html(data, manifest, manifest_sha, source_meta):
     else:
         video_url, vid = safe_url(source_url, youtube_only=True)
     title = data["headline"]
-    thumb = "https://i.ytimg.com/vi/" + vid + "/hqdefault.jpg"
+
     claims = []
     for c in data["claims"]:
         sec = time_seconds(c["timestamp"])
@@ -177,11 +184,11 @@ def render_html(data, manifest, manifest_sha, source_meta):
     th = data["thesis"]
     content = [
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
-        '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src https://i.ytimg.com; base-uri &#39;none&#39;; form-action &#39;none&#39;">',
+        '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">',
         '<meta name="robots" content="noindex,nofollow"><title>', esc(title), ' | GhostMesh ReasonPack</title><style>', CSS, '</style></head><body>',
         '<div class="top"></div><div class="wrap"><nav><div class="brand">GHOST<span>MESH</span> <span class="small">/ REASONPACK</span></div><div class="small">READER EDITION · PRIVATE DRAFT</div></nav>',
         '<header class="hero"><div class="eyebrow">Source investigated · GhostMesh editorial</div><h1>', esc(title), '</h1><div class="deck">', esc(data["deck"]), '</div>',
-        '<div class="hero-grid"><div class="card media"><a href="', esc(video_url), '" rel="noopener noreferrer"><img loading="lazy" alt="Video source thumbnail" src="', esc(thumb), '"></a><div class="below"><div class="label">Original source</div><h3>', esc(source_meta.get("title") or "Source title unavailable"), '</h3><p class="small">Creator: ', esc(source_meta.get("channel") or source_meta.get("uploader") or "Unknown"), '</p>', a(video_url, "Watch original video ↗"), '</div></div>',
+        '<div class="hero-grid"><div class="card media"><a href="', esc(video_url), '" rel="noopener noreferrer"><div class="source-art"><div class="play">▶</div><span>WATCH THE ORIGINAL SOURCE</span><small>External site opens only on click</small></div></a><div class="below"><div class="label">Original source</div><h3>', esc(source_meta.get("title") or "Source title unavailable"), '</h3><p class="small">Creator: ', esc(source_meta.get("channel") or source_meta.get("uploader") or "Unknown"), '</p>', a(video_url, "Watch original video ↗"), '</div></div>',
         '<div class="card"><div class="label">60-second verdict</div><div class="big">', esc(data["executive"]), '</div><p class="small">Research interpretation. Not a verified statement by the video creator.</p><span class="tag">DRAFT · Not for public release</span></div></div></header>',
         '<section><div class="label">Layer 01 / source</div><h2>What the video claims</h2><div class="prose">', p(data["source_account"]), '</div></section>',
         '<section><div class="label">Layer 02 / evidence</div><h2>What withstands scrutiny</h2><div class="prose">', p(data["evidence_summary"]), '</div><div class="claims">', "".join(claims), '</div></section>',
@@ -192,7 +199,7 @@ def render_html(data, manifest, manifest_sha, source_meta):
         '<section><div class="label">Attribution and provenance</div><h2>Follow the evidence</h2><details><summary>Related SharePlane works</summary><div><ul>', works or '<li>No approved public Works cited.</li>', '</ul></div></details>',
         '<details><summary>Source custody and limitations</summary><div>Canonical source manifest SHA-256: <code>', esc(manifest_sha), '</code>. ',
         'Integrity verification establishes the bytes of the acquisition package, not the truth of the original video or the independent research. ',
-        'Untrusted transcript text cannot authorize actions or publication. This private reader contains no embedded media or tracking scripts.</div></details></section>',
+        'Untrusted transcript text cannot authorize actions or publication. This private reader performs no external resource fetches until a reader explicitly opens a cited link.</div></details></section>',
         '<footer>GHOSTMESH · REASONPACK READER · ', esc(READER_SCHEMA), ' · PRIVATE DRAFT · Original creator credited separately. Distribution requires an independent delivery authorization.</footer>',
         '</div></body></html>'
     ]

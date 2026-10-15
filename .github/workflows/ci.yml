@@ -21,4 +21,7 @@ jobs:
       - name: Reference-kit package tests
         run: ./tests/test-package.sh
       - name: Reader Edition and mail admission security tests
-        run: python3 tests/test-reader-edition.py
+        run: |
+          python3 tests/test-reader-edition.py
+          python3 tests/test-mail-gateway-adapter.py
+          python3 tests/test-reader-pipeline.py
