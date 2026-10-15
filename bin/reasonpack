@@ -204,6 +204,7 @@ Usage:
   reasonpack doctor
   reasonpack inspect URL
   reasonpack build URL OUT_DIR
+  reasonpack build-fast URL OUT_DIR      # direct MP4/AAC remux, no video encode
   reasonpack verify OUT_DIR
   reasonpack self-test
   reasonpack URL [OUTPUT_ROOT]
@@ -214,4 +215,4 @@ EOF
 }
 cmd="${1:-}"; [[ -n "$cmd" ]] || { usage; exit 64; }; shift || true
 case "$cmd" in
- doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
+ doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; build-fast) [[ $# -eq 2 ]] || exit 64; python3 "$(dirname "$0")/../ops/direct-remux-pack.py" --source-url "$1" --output "$2";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac

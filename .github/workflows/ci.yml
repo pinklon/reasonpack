@@ -40,3 +40,4 @@ jobs:
           python3 tests/test-acquisition-sealed-admission.py
           python3 tests/test-owner-launch-claims.py
           python3 tests/test-acquisition-safe-owner-io.py
+          python3 tests/test-direct-remux-pack.py
