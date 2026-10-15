@@ -55,7 +55,8 @@ def verify_root_owned_anchor():
 def release_path(commit):
     if not isinstance(commit,str) or not SHA40.fullmatch(commit):
         deny("exact 40-hex reviewed source commit required")
-    verify_root_owned_anchor()
+    # Rendering is portable and deterministic; host safety is checked by
+    # build() before it emits an owner-usable preflight proposal.
     return RELEASE_ROOT/commit
 
 def module(path,name):
@@ -109,6 +110,7 @@ def build(commit,out):
     source=git_revision()
     if source!=commit:deny("checked-out source is not exact owner-reviewed commit")
     if out.exists() or out.is_symlink():deny("preflight output already exists")
+    verify_root_owned_anchor()
     text=render(commit)
     out.parent.mkdir(parents=True,exist_ok=True)
     stage=Path(tempfile.mkdtemp(prefix=".reasonpack-release-preflight-",dir=out.parent))

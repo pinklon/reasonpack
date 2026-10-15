@@ -59,3 +59,7 @@ non-root-owned or group/world-writable ancestor directories. It accepts
 absent descendant directories only because it does not create or install them.
 The privileged owner installer must create each as root-owned and reverify
 all components before publishing any unit.
+
+## Hosted CI portability correction
+
+GitHub-hosted test runners may have an `/opt` directory owned by the runner rather than root. Pure unit rendering and candidate-schema checks therefore remain portable and deterministic, while the real preflight `build()` explicitly performs the host-side root-ownership check before generating an operator review package. A negative test simulates an unsafe `/opt` and ensures no review package is written. The check is never skipped on an actual operator preflight.
