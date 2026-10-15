@@ -160,6 +160,19 @@ class LongFormTests(unittest.TestCase):
              "source_truth_attested":False,"final_answer_authorized":False}
         candidate_path=self.t/"first-segment.json"
         candidate_path.write_text(json.dumps(observed))
+        # Simulate a crash after the candidate has been staged and fsynced
+        # but before the final no-clobber link can publish it.
+        import importlib.util
+        from unittest import mock
+        spec=importlib.util.spec_from_file_location(
+            "segment_progress_under_test",ROOT/"ops/segment-progress.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with mock.patch.object(module.os,"link",side_effect=OSError("simulated process interruption")):
+            with self.assertRaisesRegex(OSError,"simulated"):
+                module.stage(output,checkpoint,0,candidate_path)
+        self.assertFalse((checkpoint/"segment-000000.json").exists())
+        self.assertEqual(module.status(output,checkpoint)["segments_staged"],0)
         accepted=run("segment-progress.py","stage","--composition",output,
               "--results",checkpoint,"--index",0,"--candidate",candidate_path)
         self.assertEqual(accepted.returncode,0,accepted.stderr)

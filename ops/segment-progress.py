@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 
 SCHEMA="ghostmesh.reasonpack.segment-candidate.v1"
 RECEIPT="ghostmesh.reasonpack.segment-progress.v1"
@@ -72,9 +73,26 @@ def stage(composition,results,index,candidate):
         if path.read_bytes()!=raw:
             deny("conflicting candidate on already staged segment")
         return {"status":"already-staged","segment":index}
-    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-    with os.fdopen(fd,"wb") as f:
-        f.write(raw);f.flush();os.fsync(f.fileno())
+    # Construct and fsync a complete candidate in a sibling private file,
+    # then use a no-clobber hard link for atomic publication. Crash before
+    # linking leaves no partial result in the checkpoint directory.
+    fd,name=tempfile.mkstemp(prefix=".segment-checkpoint-",dir=results.parent)
+    temp=Path(name)
+    try:
+        os.fchmod(fd,0o600)
+        with os.fdopen(fd,"wb") as f:
+            f.write(raw);f.flush();os.fsync(f.fileno())
+        try:
+            os.link(temp,path)
+        except FileExistsError:
+            if path.is_symlink() or path.read_bytes()!=raw:
+                deny("conflicting candidate on already staged segment")
+            return {"status":"already-staged","segment":index}
+        directory_fd=os.open(results,os.O_RDONLY|os.O_DIRECTORY)
+        try:os.fsync(directory_fd)
+        finally:os.close(directory_fd)
+    finally:
+        temp.unlink(missing_ok=True)
     return {"status":"staged-unreviewed","segment":index,"candidate_sha256":digest(raw)}
 
 def status(composition,results):
