@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -93,6 +94,22 @@ def output_hint(output):
         if (output/name).exists():return description
     return "source-processing-state-unknown"
 
+def observed_file_sizes(directory):
+    """Best-effort source progress; transient file removal cannot fail a job."""
+    try:
+        count=0
+        size=0
+        for path in directory.iterdir():
+            try: info=path.lstat()
+            except (FileNotFoundError,NotADirectoryError,PermissionError):
+                continue
+            if stat.S_ISREG(info.st_mode):
+                size+=info.st_size
+                count+=1
+        return {"bytes":size,"files":count,"scan_complete":True}
+    except OSError:
+        return {"bytes":None,"files":None,"scan_complete":False}
+
 def execute(job,receipt,*,cli=CLI,pin=PIN,runner=subprocess.Popen,verify_runner=subprocess.run,
             interval=0.5,max_log_bytes=8_000_000):
     preflight(cli,pin)
@@ -117,6 +134,7 @@ def execute(job,receipt,*,cli=CLI,pin=PIN,runner=subprocess.Popen,verify_runner=
             while True:
                 sequence+=1
                 rc=child.poll()
+                hints=observed_file_sizes(output)
                 atomic(job/"real-acquisition-heartbeat.json",{
                     "schema":"ghostmesh.reasonpack.acquisition-real-heartbeat.v1",
                     "job_id":receipt["job_id"],"worker_pid":os.getpid(),
@@ -126,9 +144,10 @@ def execute(job,receipt,*,cli=CLI,pin=PIN,runner=subprocess.Popen,verify_runner=
                     "backend_pgid":safe_group(child.pid) if rc is None else None,
                     "sequence":sequence,
                     "time_utc":datetime.now(timezone.utc).isoformat(),
-                    "phase_hint":output_hint(output),"observed_source_bytes":sum(
-                        p.stat().st_size for p in output.iterdir()
-                        if p.is_file() and not p.is_symlink()),
+                    "phase_hint":output_hint(output),
+                    "observed_source_bytes":hints["bytes"],
+                    "observed_source_files":hints["files"],
+                    "progress_scan_complete":hints["scan_complete"],
                     "actual_source_integrity":"NOT_VERIFIED_UNTIL_COMPLETION",
                     "source_report_authority":"WORKER_SELF_REPORT",
                     "mission_duration_limit":None,"email_dispatched":False})

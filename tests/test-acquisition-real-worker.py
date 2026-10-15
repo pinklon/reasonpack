@@ -95,6 +95,23 @@ class RealAdapterTests(unittest.TestCase):
             A.execute(self.job,self.receipt,cli=self.binary,pin="f"*64,
                runner=FakeProcess,verify_runner=fake_verify)
         self.assertFalse((self.job/"raw-acquisition").exists())
+    def test_renamed_temporary_file_does_not_fail_progress_scan(self):
+        from unittest import mock
+        directory=self.job/"progress-input"
+        directory.mkdir()
+        (directory/"video.mp4").write_bytes(b"123456")
+        (directory/"vanished.tmp").write_bytes(b"transient")
+        original=Path.lstat
+        def raced(self,*args,**kwargs):
+            if self.name=="vanished.tmp":
+                raise FileNotFoundError("normal file cleanup")
+            return original(self,*args,**kwargs)
+        with mock.patch.object(Path,"lstat",raced):
+            observed=A.observed_file_sizes(directory)
+        self.assertTrue(observed["scan_complete"])
+        self.assertEqual(observed["files"],1)
+        self.assertEqual(observed["bytes"],6)
+
     def test_backend_nonzero_does_not_publish_completion(self):
         class Failed:
             def __init__(self,argv,**kw):self.pid=os.getpid()
