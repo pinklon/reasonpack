@@ -1,0 +1,26 @@
+{
+  "schema": "ghostmesh.reasonpack.analysis.v1",
+  "video_id": "jNQXAC9IVRw",
+  "headline": "Synthetic Reader Example",
+  "deck": "A sample showing the three editorial layers without claiming a real video was researched.",
+  "executive": "This fixture cannot support real-world factual conclusions.",
+  "source_account": "Only a synthetic test transcript is available.",
+  "evidence_summary": "Independent research has not been performed in this test.",
+  "claims": [
+    {
+      "timestamp": "00:00",
+      "statement": "The fixture is synthetic.",
+      "assessment": "Nothing beyond fixture structure has been established.",
+      "verdict": "unknown",
+      "sources": []
+    }
+  ],
+  "thesis": {
+    "title": "Evidence Before Interpretation",
+    "argument": "Source custody and independent judgment are two separate obligations.",
+    "mechanism": "A record of what was said remains distinct from a reasoned interpretation of its meaning.",
+    "counterargument": "Low-risk video reviews need not all receive expensive external research.",
+    "implication": "Scale adjudication effort to consequence, but never invent certainty."
+  },
+  "shareplane_works": []
+}

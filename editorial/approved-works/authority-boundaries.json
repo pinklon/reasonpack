@@ -1,0 +1,11 @@
+{
+  "schema": "ghostmesh.shareplane.public-context.v1",
+  "visibility": "public",
+  "owner_reviewed": true,
+  "title": "Let Intelligence Be Messy. Make Authority Boring.",
+  "url": "https://shareplane.malott.ai/artifacts/let-intelligence-be-messy-make-authority-boring/",
+  "source_commit": "f0459dce8f71167b66924c18fcaaae813f6ac165",
+  "source_path": "content/artifacts/let-intelligence-be-messy-make-authority-boring/source.md",
+  "source_blob_sha": "4ead3225339dd37524c5abef2089d658c74ae8c6",
+  "excerpt": "I do not need an AI system to be trustworthy in the human sense. I need the system around it to remain trustworthy when the AI is wrong. The model is a tool. A very unusual tool, obviously. It can reason, synthesize, adapt, write code, challenge assumptions, and discover paths we did not explicitly enumerate. That is exactly why it is valuable. But none of those capabilities should quietly become permission to change consequential state."
+}
