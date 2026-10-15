@@ -150,6 +150,22 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"excerpt missing"):
             mod.collect(self.packet,self.catalog,self.out,private_test_override=True,fetcher=lambda _: (PAGE,"text/html","8.8.8.8"))
         self.assertFalse(self.out.exists())
+    def test_classification_rewrite_cannot_promote_context_to_independent(self):
+        self.source["evidence_type"]="context"
+        self.save_catalog()
+        mod.collect(self.packet,self.catalog,self.out,private_test_override=True,
+                    fetcher=lambda _: (PAGE,"text/html","8.8.8.8"))
+        reg_path=self.out/"research-evidence.json"
+        rec_path=self.out/"capture-receipt.json"
+        reg=json.loads(reg_path.read_text())
+        reg["sources"][0]["evidence_type"]="independent"
+        reg_path.write_text(json.dumps(reg))
+        receipt=json.loads(rec_path.read_text())
+        receipt["evidence_register_sha256"]=sha256(reg_path.read_bytes()).hexdigest()
+        rec_path.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError,"classification"):
+            mod.verify_capture(self.packet,self.catalog,self.out,private_test_override=True)
+
     def test_mutated_raw_source_is_rejected_on_readback(self):
         mod.collect(self.packet,self.catalog,self.out,private_test_override=True,
                     fetcher=lambda _: (PAGE,"text/html","8.8.8.8"))

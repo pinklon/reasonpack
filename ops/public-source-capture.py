@@ -269,6 +269,10 @@ def verify_capture(packet_path,catalog_path,folder,*,private_test_override=False
     for c,source,row in zip(records,registry["sources"],catalog["sources"]):
         if c.get("source_id")!=row["id"] or c.get("url")!=row["url"] or source.get("id")!=row["id"] or source.get("url")!=row["url"]:
             fail("capture source attribution changed")
+        if any(source.get(field)!=row[field] for field in ("title","publisher","evidence_type")):
+            fail("research evidence classification or attribution differs from curated catalog")
+        if source.get("retrieved_at_utc")!=c.get("retrieved_at_utc"):
+            fail("research source retrieval timestamp mismatch")
         raw_path=snapdir/(row["id"]+".raw")
         text_path=snapdir/(row["id"]+".text")
         allowed.update([raw_path.name,text_path.name])
