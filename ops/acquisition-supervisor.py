@@ -190,6 +190,7 @@ def observe(jobdir):
             and value.get("complete") is True):
             completion=value
     source_proof=None
+    backend_observed=None
     if s.get("worker_kind")=="real-acquisition":
         hb=jobdir/"real-acquisition-heartbeat.json"
         if hb.is_file() and not hb.is_symlink():
@@ -201,6 +202,23 @@ def observe(jobdir):
                  and isinstance(report.get("sequence"),int) and report["sequence"]>0):
                 s["last_progress_sequence"]=report["sequence"]
                 s["last_progress_at"]=report.get("time_utc")
+                backend_pid=report.get("backend_pid")
+                backend_ticks=report.get("backend_start_ticks")
+                backend_pgid=report.get("backend_pgid")
+                if (isinstance(backend_pid,int) and backend_pid>1
+                    and isinstance(backend_ticks,int) and backend_ticks>0
+                    and backend_pgid==backend_pid
+                    and startticks(backend_pid)==backend_ticks):
+                    # A heartbeat is a worker self-report, not independent
+                    # parent/child authority. Expose potential orphanage for
+                    # operator reconciliation, never auto-kill/retry.
+                    try:
+                        if os.getpgid(backend_pid)==backend_pgid:
+                            backend_observed={"pid":backend_pid,
+                                             "start_ticks":backend_ticks,
+                                             "pgid":backend_pgid}
+                    except ProcessLookupError:
+                        pass
         result=jobdir/"real-acquisition-result.json"
         if result.is_file() and not result.is_symlink():
             item=load(result)
@@ -234,6 +252,8 @@ def observe(jobdir):
         classification="running-progress-unknown"
     elif source_proof:
         classification="source-package-reverified"
+    elif s.get("worker_kind")=="real-acquisition" and backend_observed:
+        classification="orphaned-backend-active-reconciliation-required"
     elif completion:
         classification="synthetic-fixture-complete"
     else:
@@ -243,6 +263,8 @@ def observe(jobdir):
             "last_progress_sequence":s.get("last_progress_sequence"),
             "last_progress_at":s.get("last_progress_at"),
             "progress_provenance":"worker-self-report-not-independent",
+            "potential_orphan_backend":backend_observed,
+            "backend_process_group_authority":"observation-only-no-auto-stop",
             "independent_progress_witness":False,
             "mission_elapsed_cutoff":None,
             "auto_retry_without_reconciliation":False,

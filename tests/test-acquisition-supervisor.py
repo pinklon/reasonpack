@@ -156,6 +156,38 @@ class DurableTests(unittest.TestCase):
         self.assertEqual(self.observe()["status"],"registered-no-worker")
         self.assertFalse((self.job/"real-worker.stdout").exists())
 
+    def test_real_backend_orphan_is_detected_without_automatic_kill_or_retry(self):
+        self.assertEqual(self.register().returncode,0)
+        fixture=subprocess.Popen(["/usr/bin/sleep","3"],start_new_session=True,
+                                 stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        try:
+            import importlib.util
+            spec=importlib.util.spec_from_file_location("real_orphan_supervisor",
+                           ROOT/"ops/acquisition-supervisor.py")
+            sup=importlib.util.module_from_spec(spec);spec.loader.exec_module(sup)
+            s=json.loads((self.job/"supervision.json").read_text())
+            s.update(status="running",worker_kind="real-acquisition",
+                     worker_pid=999999,worker_start_ticks=123456,attempts=1)
+            (self.job/"supervision.json").write_text(json.dumps(s))
+            (self.job/"real-acquisition-heartbeat.json").write_text(json.dumps({
+                "schema":"ghostmesh.reasonpack.acquisition-real-heartbeat.v1",
+                "job_id":self.receipt["job_id"],"worker_pid":999999,
+                "worker_start_ticks":123456,"backend_pid":fixture.pid,
+                "backend_start_ticks":sup.startticks(fixture.pid),
+                "backend_pgid":os.getpgid(fixture.pid),
+                "sequence":1,"time_utc":"2026-10-15T17:00:00+00:00"}))
+            observed=self.observe()
+            self.assertEqual(observed["status"],
+                             "orphaned-backend-active-reconciliation-required")
+            self.assertEqual(observed["potential_orphan_backend"]["pid"],fixture.pid)
+            self.assertFalse(observed["automatic_restart_authorized"])
+            self.assertFalse(observed["artifact_verified"])
+            self.assertIsNone(observed["verified_manifest_sha256"])
+        finally:
+            try:os.killpg(fixture.pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+            fixture.wait(timeout=3)
+
     def test_forged_real_source_receipt_is_not_acquisition_success(self):
         self.assertEqual(self.register().returncode,0)
         s=json.loads((self.job/"supervision.json").read_text())

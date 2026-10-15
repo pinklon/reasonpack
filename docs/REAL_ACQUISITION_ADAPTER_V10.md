@@ -48,3 +48,13 @@ A future qualified operator may manually invoke `acquisition-supervisor.py launc
 5. Owner-only email canary must witness one actual delivery, not just source-package completion.
 
 Rollback: abandon this staged branch or leave the new command uninvoked. Active GhostMesh and ReasonPack daemons are unchanged.
+
+## Independent review finding and exact source limitations
+
+The first read-only security review of this candidate found that the real backend runs in its own process session. If the supervised worker is killed with SIGKILL, the downloader/transcoder group may survive, so worker PID loss alone cannot be equated to stopped acquisition. Source was hardened to include exact backend PID/start ticks and process group in worker self-reported progress. The supervisor's readback now reports \`orphaned-backend-active-reconciliation-required\` for an observed still-running backend and refuses an automatic replacement. A regression exercises the situation with a harmless independent sleep process and verifies no automatic kill or retry.
+
+This observation is **not sufficient for Production process containment**. A compromised worker can forge self-report metadata, and active backend termination/release requires a separately reviewed cgroup or equivalent process-group/privilege boundary, an independent process witness and operator-approved cancellation. No autonomous orphan cleanup is implemented.
+
+The installed ReasonPack CLI remains version \`1.0-refkit.1\`. Its embedded pack verifier uses whole-file reads, which can cause memory pressure for multi-gigabyte, multi-hour media, and its \`build\` sequence is not yet resumable step by step. Real multi-hour commissioning must therefore repair/qualify streaming checksum verification and per-stage restart support in the pinned CLI before relying on this adapter. The installed CLI digest in this source is a readback of the current executable, **not** an assertion that the CLI itself is production-qualified for long media.
+
+The backend code, tests and README are source only. No real YouTube request was made during these tests; the worker is not installed or invoked by the live intake.

@@ -35,6 +35,10 @@ def identity(pid):
         return int(t[19]) if t[0] not in ("Z","X","x") else None
     except (OSError,ValueError,IndexError):return None
 
+def safe_group(pid):
+    try:return os.getpgid(pid)
+    except ProcessLookupError:return None
+
 def atomic(path,obj):
     fd,name=tempfile.mkstemp(prefix=".verified-backend-",dir=path.parent)
     staging=Path(name)
@@ -117,7 +121,10 @@ def execute(job,receipt,*,cli=CLI,pin=PIN,runner=subprocess.Popen,verify_runner=
                     "schema":"ghostmesh.reasonpack.acquisition-real-heartbeat.v1",
                     "job_id":receipt["job_id"],"worker_pid":os.getpid(),
                     "worker_start_ticks":identity(os.getpid()),
-                    "backend_pid":child.pid,"sequence":sequence,
+                    "backend_pid":child.pid,
+                    "backend_start_ticks":identity(child.pid),
+                    "backend_pgid":safe_group(child.pid) if rc is None else None,
+                    "sequence":sequence,
                     "time_utc":datetime.now(timezone.utc).isoformat(),
                     "phase_hint":output_hint(output),"observed_source_bytes":sum(
                         p.stat().st_size for p in output.iterdir()
