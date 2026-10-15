@@ -35,7 +35,7 @@ The `evidence` transition records either `SOURCE_BYTES_VERIFIED` or `MANUAL_REGI
 - Curated source URLs and reviewed excerpt needles are data in repository-controlled source files, not extracted from arbitrary email/video/model text.
 - Public hostname allowlist is fixed in source. HTTPS only, default 443, no userinfo, IP literal, unexpected port, localhost, or internal host.
 - Resolve DNS and reject non-global results. Connect directly to the verified IP while verifying TLS for the original hostname. No HTTP redirects and no environment proxy use.
-- Bounded per-source time, up to 2 MB raw body and 160,000 parsed text characters, up to eight approved sources. No scripts, browser, cookies, credential headers or model calls.
+- Bounded per-source wall-clock deadline (including DNS, TLS, headers, response body), up to 2 MB raw body and 160,000 parsed text characters, up to eight approved sources. No scripts, browser, cookies, credential headers or model calls.
 - Require exact 200 and text/html or text/plain. A redirect, unsupported content type, missing needle, request failure or oversized body yields HOLD, never a fabricated source.
 - Preserve raw public page snapshot, normalized readable text, source URL/publisher/operator classification, retrieval timestamp, peer IP and SHA-256 digests in owner-private 0600 files.
 - Verification recomputes source and text hashes from the saved snapshots, checks catalog and original job identity, and rejects extra files.
@@ -55,3 +55,5 @@ The assembled two-source registry was tied to the existing ReasonPack manifest a
 ## Nonproduction and rollback
 
 No systemd units, scheduled jobs, DNS, credentials, Gmail source or production websites changed. Stop invoking the collector or remove the private generated capture version to roll back. The previously qualified Reader branch and active responder remain unchanged. Source-only PR must pass hosted exact-head CI and independent review before merge.
+
+An independent read-only review found two defects at the first source head: timeout applied only per socket operation, and case-folded Unicode could shift the excerpt offset. The revised collector uses a Linux SIGALRM wall-clock deadline and a regex match on original Unicode text offsets; regression tests cover both. If a caller already owns the signal alarm, retrieval returns HOLD rather than replacing its deadline. No concurrent threaded calls to the collector are supported in this version.

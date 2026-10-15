@@ -106,6 +106,29 @@ class CaptureTests(unittest.TestCase):
         self.assertTrue(path.startswith("/blog/"))
         self.assertNotIn("Cookie",headers)
         self.assertNotIn("Authorization",headers)
+    def test_total_deadline_stops_slow_read(self):
+        import time
+        class Slow(Response):
+            def read(self,n):
+                time.sleep(.4)
+                return self.raw
+        Connection.responses=[Slow()]
+        start=time.monotonic()
+        with self.assertRaises(TimeoutError):
+            mod.fetch(SOURCE,timeout=.05,transport=Connection,resolve=lambda _:"8.8.8.8")
+        self.assertLess(time.monotonic()-start,.30)
+
+    def test_unicode_casefold_offset_cannot_shift_excerpt(self):
+        raw="<html><p>Straße Hugging Face occurred.</p></html>".encode()
+        self.source["needle"]="Hugging Face"
+        self.save_catalog()
+        mod.collect(self.packet,self.catalog,self.out,private_test_override=True,
+                    fetcher=lambda _: (raw,"text/html","8.8.8.8"))
+        reg=json.loads((self.out/"research-evidence.json").read_text())
+        self.assertTrue(reg["sources"][0]["excerpt"].startswith("Hugging Face"))
+        proof=mod.verify_capture(self.packet,self.catalog,self.out,private_test_override=True)
+        self.assertEqual(proof["status"],"capture-bytes-verified")
+
     def test_redirect_fails_closed(self):
         Connection.responses=[Response(status=302)]
         with self.assertRaisesRegex(ValueError,"redirect"):

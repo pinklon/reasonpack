@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import socket
 import ssl
 import sys
@@ -96,11 +97,20 @@ def normalized_text(raw,content_type):
 
 def fetch(url,*,timeout=12, transport=None, resolve=None):
     host,path=safe_source(url)
-    peer=(resolve or safe_resolve)(host)
-    if not ip_address(peer).is_global:
-        fail("peer IP is not global")
+    if not isinstance(timeout,(float,int)) or not 0 < timeout <= 60:
+        fail("invalid finite per-source deadline")
+    if signal.getitimer(signal.ITIMER_REAL)[0] > 0:
+        fail("cannot replace a preexisting caller deadline")
+    old_handler=signal.getsignal(signal.SIGALRM)
+    def expired(_signum,_frame):
+        raise TimeoutError("bounded source retrieval wall-clock deadline exceeded")
     conn=None
+    signal.signal(signal.SIGALRM,expired)
+    signal.setitimer(signal.ITIMER_REAL,timeout)
     try:
+        peer=(resolve or safe_resolve)(host)
+        if not ip_address(peer).is_global:
+            fail("peer IP is not global")
         conn=(transport or PinnedConnection)(host,peer,timeout)
         conn.request("GET",path,headers={
             "Accept":"text/html,text/plain",
@@ -122,6 +132,8 @@ def fetch(url,*,timeout=12, transport=None, resolve=None):
         if not raw:fail("empty external source")
         return raw,mime,peer
     finally:
+        signal.setitimer(signal.ITIMER_REAL,0)
+        signal.signal(signal.SIGALRM,old_handler)
         if conn: conn.close()
 
 def write_private(target,bytes_):
@@ -185,9 +197,10 @@ def collect(packet_path,catalog_path,outdir,*,fetcher=None,private_test_override
         content,mime,ip=(fetcher or fetch)(row["url"])
         page=normalized_text(content,mime)
         needle=re.sub(r"\s+"," ",row["needle"]).strip()
-        if needle.casefold() not in page.casefold():
+        match=re.search(re.escape(needle),page,re.IGNORECASE)
+        if not match:
             fail("reviewed excerpt missing from independently retrieved public content: "+row["id"])
-        excerpt=page[page.casefold().find(needle.casefold()):][:min(1400,len(page))]
+        excerpt=page[match.start():][:min(1400,len(page))]
         now=datetime.now(timezone.utc).isoformat()
         registry["sources"].append({"id":row["id"],"url":row["url"],
            "title":row["title"],"publisher":row["publisher"],
@@ -276,8 +289,10 @@ def verify_capture(packet_path,catalog_path,folder,*,private_test_override=False
         if source.get("excerpt","") not in actual_text:
             fail("evidence excerpt no longer matches raw source")
         needle=re.sub(r"\s+"," ",row["needle"]).strip()
-        if needle.casefold() not in actual_text.casefold():
+        if not re.search(re.escape(needle),actual_text,re.IGNORECASE):
             fail("reviewed source needle absent in preserved bytes")
+        if not re.match(re.escape(needle),source["excerpt"],re.IGNORECASE):
+            fail("excerpt does not begin with reviewed source needle")
     actual={x.name for x in snapdir.iterdir()}
     if actual!=allowed:
         fail("unexpected or missing source snapshot members")
