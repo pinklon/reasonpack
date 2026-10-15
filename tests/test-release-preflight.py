@@ -37,6 +37,25 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn("/current/",unit)
         self.assertIn("KillMode=control-group",unit)
         self.assertIn("ReadWritePaths=/srv/ghostmesh/workspaces/runs/reasonpack-jobs/%i",unit)
+    def test_reject_service_user_writable_or_symlinked_release_ancestor(self):
+        from unittest import mock
+        import types
+        original=Path.lstat
+        def bad_owner(obj,*args,**kwargs):
+            result=original(obj,*args,**kwargs)
+            if str(obj)=="/opt":
+                return types.SimpleNamespace(st_mode=result.st_mode,
+                    st_uid=1001)
+            return result
+        with mock.patch.object(Path,"lstat",bad_owner):
+            with self.assertRaisesRegex(ValueError,"non-root-owned"):
+                P.release_path(COMMIT)
+
+    def test_release_root_is_root_controlled_opt_not_writable_workspace(self):
+        self.assertEqual(str(P.RELEASE_ROOT),"/opt/ghostmesh/reasonpack/releases")
+        self.assertNotIn("/workspaces/runtime/",P.render(COMMIT))
+        self.assertTrue(P.verify_root_owned_anchor())
+
     def test_invalid_revision_rejected(self):
         for value in ("HEAD", "a"*39, "A"*40,"a"*40+"/..","../main",""):
             with self.subTest(value=value),self.assertRaises(ValueError):
