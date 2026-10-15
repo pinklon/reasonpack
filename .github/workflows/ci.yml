@@ -35,3 +35,4 @@ jobs:
           python3 tests/test-acquisition-real-worker.py
           python3 tests/test-streaming-integrity.py
           python3 tests/test-acquisition-cgroup-contract.py
+          python3 tests/test-release-preflight.py
