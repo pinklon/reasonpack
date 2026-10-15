@@ -202,6 +202,20 @@ class MailTests(unittest.TestCase):
         d=dict(self.base,body_text="Thanks\n\nOn yesterday wrote:\n> ReasonPack https://youtu.be/jNQXAC9IVRw")
         self.sign(d);self.assertEqual(self.run_admit().returncode,2)
 
+    def test_long_shortlink_cannot_be_truncated_to_valid_video(self):
+        d=dict(self.base,body_text="ReasonPack https://youtu.be/jNQXAC9IVRwINVALID")
+        self.sign(d)
+        rejected=self.run_admit()
+        self.assertEqual(rejected.returncode,2)
+        self.assertIn("malformed YouTube", rejected.stderr)
+        self.assertFalse(self.out.exists())
+
+    def test_malformed_second_shortlink_invalidates_request(self):
+        d=dict(self.base,body_text="ReasonPack https://youtu.be/jNQXAC9IVRw and https://youtu.be/ZhM29Ds-mBgINVALID")
+        self.sign(d)
+        self.assertEqual(self.run_admit().returncode,2)
+        self.assertFalse(self.out.exists())
+
     def test_multiple_distinct_videos_rejected(self):
         d=dict(self.base,body_text="ReasonPack https://youtu.be/jNQXAC9IVRw and https://youtu.be/ZhM29Ds-mBg")
         self.sign(d);self.assertEqual(self.run_admit().returncode,2)

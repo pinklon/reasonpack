@@ -15,7 +15,7 @@ import sys
 from urllib.parse import urlparse, parse_qs
 
 SCHEMA = "ghostmesh.reasonpack.mail-intake.v1"
-YOUTUBE = re.compile(r"https://(?:www\.|m\.)?(?:youtube\.com/watch\?[^\s<>]+|youtu\.be/[A-Za-z0-9_-]{11})", re.I)
+YOUTUBE = re.compile(r"https://(?:www\.|m\.)?(?:youtube\.com/watch\?[^\s<>]+|youtu\.be/[^\s<>]+)", re.I)
 INTENT = re.compile(r"\b(?:reason[\s-]?pack|reasoning[\s-]?pack)\b", re.I)
 MESSAGE_ID = re.compile(r"^<[^<>\r\n]{3,220}>$")
 VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -91,8 +91,9 @@ def parse_intent(body):
         u = urlparse(match)
         host = (u.hostname or "").lower()
         v = u.path.strip("/") if host=="youtu.be" else parse_qs(u.query).get("v",[""])[0] if u.path=="/watch" else ""
-        if VID.fullmatch(v):
-            video_ids.add(v)
+        if not VID.fullmatch(v):
+            reject("malformed YouTube source URL: complete video ID required")
+        video_ids.add(v)
     if len(video_ids)!=1:
         reject("request must contain exactly one distinct valid YouTube source")
     vid = next(iter(video_ids))
