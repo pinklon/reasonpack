@@ -22,7 +22,16 @@ from urllib.parse import urlsplit, parse_qs
 
 ROOT=Path(__file__).resolve().parents[1]
 VIDEO_ID=re.compile(r"^[A-Za-z0-9_-]{11}$")
-TIME=re.compile(r"^(\d\d):(\d\d):(\d\d)\.(\d{3}) --> (\d\d):(\d\d):(\d\d)\.(\d{3})(?:\s|$)")
+VTT_TIME=r"(?:[0-9]{2}:)?[0-9]{2}:[0-9]{2}\.[0-9]{3}"
+TIME=re.compile(r"^(?P<start>"+VTT_TIME+r") --> (?P<end>"+VTT_TIME+r")(?:\s|$)")
+
+def vtt_seconds(value):
+    fields=value.split(":")
+    if len(fields)==2:
+        minute,sec=fields
+        return int(minute)*60+float(sec)
+    hour,minute,sec=fields
+    return int(hour)*3600+int(minute)*60+float(sec)
 MEMBERS=("video.mp4","audio.m4a","transcript.txt","transcript-status.json",
          "source.json","ffprobe.json","captions.vtt")
 MAX_SOURCE_JSON=8_000_000
@@ -90,10 +99,9 @@ def timed_vtt(raw):
     for index,line in enumerate(rows):
         m=TIME.match(line)
         if m:
-            times=[int(x) for x in m.groups()]
-            h,minute,sec,milli=times[4:]
-            endpoint=h*3600+minute*60+sec+milli/1000
-            if endpoint<0 or (latest>=0 and endpoint<latest):
+            start=vtt_seconds(m.group("start"))
+            endpoint=vtt_seconds(m.group("end"))
+            if start<0 or endpoint<start or (latest>=0 and endpoint<latest):
                 hold("out-of-order or invalid caption cue end")
             latest=endpoint
             cues+=1
@@ -166,20 +174,30 @@ def build(url,target,*,run=invoke,probe_media=probe):
         vp=probe_media(video); ap=probe_media(stage/"audio.m4a")
         media=validate_direct_media(video,stage/"audio.m4a",vp,ap)
         write_json(stage/"ffprobe.json",vp)
-        run(["yt-dlp","--ignore-config","--no-playlist","--skip-download",
-             "--write-subs","--write-auto-subs",
-             "--sub-langs","en-orig,en,en.*","--sub-format","vtt",
-             "-o",str(stage/"captions.%(ext)s"),url])
-        regional=sorted(x for x in stage.glob("captions.en-*.vtt")
-                        if re.fullmatch(r"captions\.en-[A-Za-z0-9-]+\.vtt",x.name)
-                        and x.name!="captions.en-orig.vtt")
-        choices=[stage/"captions.en-orig.vtt",stage/"captions.en.vtt",*regional]
-        options=[x for x in choices if x.is_file() and not x.is_symlink()]
-        if not options:hold("no English captions; transcription required")
-        chosen=options[0]
+        catalog=set((meta.get("subtitles") or {}).keys())
+        catalog.update((meta.get("automatic_captions") or {}).keys())
+        regional=sorted(x for x in catalog if re.fullmatch(r"en-[A-Za-z0-9-]+",x)
+                        and x!="en-orig")
+        languages=["en-orig","en",*regional]
+        if catalog:
+            languages=[x for x in languages if x in catalog]
+        chosen=None
+        for language in languages:
+            # One language at a time: failure of an unused translation cannot
+            # invalidate an already available original English caption.
+            try:
+                run(["yt-dlp","--ignore-config","--no-playlist","--skip-download",
+                     "--write-subs","--write-auto-subs",
+                     "--sub-langs",language,"--sub-format","vtt",
+                     "-o",str(stage/"captions.%(ext)s"),url])
+            except subprocess.CalledProcessError:
+                continue
+            candidate=stage/("captions."+language+".vtt")
+            if candidate.is_file() and not candidate.is_symlink():
+                chosen=candidate
+                break
+        if chosen is None:hold("no usable English captions; transcription required")
         os.replace(chosen,stage/"captions.vtt")
-        # Do not leave auxiliary caption language files in a strictly
-        # inventoried seven-member canonical package.
         for extra in stage.glob("captions.*.vtt"):
             if extra.exists():extra.unlink()
         transcript,captions=timed_vtt((stage/"captions.vtt").read_bytes())

@@ -32,7 +32,8 @@ class DirectPackTests(unittest.TestCase):
             self.assertIn("--ignore-config",argv)
             self.assertIn("--no-playlist",argv)
             if "--dump-single-json" in argv:
-                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False}).encode())
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,
+                  "subtitles":{"en-orig":[{"ext":"vtt"}],"en":[{"ext":"vtt"}]}}).encode())
             elif "--write-subs" in argv:
                 template=Path(argv[argv.index("-o")+1])
                 p=template.with_name("captions.en-orig.vtt")
@@ -107,6 +108,11 @@ class DirectPackTests(unittest.TestCase):
             M.timed_vtt(b"not captions")
     def test_regional_english_captions_complete_canonical_package(self):
         def regional_runner(argv,*,stdout=None):
+            if "--dump-single-json" in argv:
+                self.calls.append(argv)
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,
+                    "automatic_captions":{"en-US":[{"ext":"vtt"}]}}).encode())
+                return
             self.fake_run(argv,stdout=stdout)
             if "--write-subs" in argv:
                 template=Path(argv[argv.index("-o")+1])
@@ -119,8 +125,46 @@ class DirectPackTests(unittest.TestCase):
         self.assertEqual((self.tmp/"regional/captions.vtt").read_bytes(),VTT)
         names={p.name for p in (self.tmp/"regional").iterdir()}
         self.assertNotIn("captions.en-US.vtt",names)
-        self.assertTrue(any("--sub-langs" in c and any("en.*" in arg for arg in c)
+        self.assertTrue(any("--sub-langs" in c and c[c.index("--sub-langs")+1]=="en-US"
                             for c in self.calls if c[0]=="yt-dlp"))
+
+    def test_unused_regional_fallback_is_not_downloaded(self):
+        def runner(argv,*,stdout=None):
+            if "--dump-single-json" in argv:
+                self.calls.append(argv)
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc",
+                  "automatic_captions":{"en-orig":[{"ext":"vtt"}],
+                                        "en-GB":[{"ext":"vtt"}]}}).encode())
+                return
+            if "--sub-langs" in argv and argv[argv.index("--sub-langs")+1]=="en-GB":
+                self.fail("Unused regional fallback must not be downloaded")
+            self.fake_run(argv,stdout=stdout)
+        got=M.build(URL,self.tmp/"preferred",run=runner,probe_media=self.fake_probe)
+        self.assertEqual(got["status"],"canonical-direct-remux-verified")
+        langs=[c[c.index("--sub-langs")+1] for c in self.calls
+               if c[0]=="yt-dlp" and "--sub-langs" in c]
+        self.assertEqual(langs,["en-orig"])
+
+    def test_original_track_failure_falls_back_to_english(self):
+        def runner(argv,*,stdout=None):
+            if ("--sub-langs" in argv
+                 and argv[argv.index("--sub-langs")+1]=="en-orig"):
+                self.calls.append(argv)
+                raise subprocess.CalledProcessError(1,argv)
+            self.fake_run(argv,stdout=stdout)
+        got=M.build(URL,self.tmp/"fallback",run=runner,probe_media=self.fake_probe)
+        self.assertEqual(got["status"],"canonical-direct-remux-verified")
+        langs=[c[c.index("--sub-langs")+1] for c in self.calls
+               if c[0]=="yt-dlp" and "--sub-langs" in c]
+        self.assertEqual(langs,["en-orig","en"])
+
+    def test_timestamp_without_hours_is_supported(self):
+        cue=(b"WEBVTT\n\n001\n00:00.000 --> 00:03.000\n"
+             b"First line.\n\n002\n01:20.000 --> 02:00.000\n"
+             b"Final line.\n")
+        text,meta=M.timed_vtt(cue)
+        self.assertEqual(meta["last_caption_second"],120.0)
+        self.assertEqual(text,b"First line.\nFinal line.\n")
 
     def test_installed_alias_can_find_pinned_helper_without_network(self):
         import shutil
