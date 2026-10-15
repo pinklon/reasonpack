@@ -17,6 +17,10 @@ import sys
 import tempfile
 import shutil
 
+# Imports from the reviewed source tree must not create bytecode and
+# invalidate the very clean-checkout identity this tool is checking.
+sys.dont_write_bytecode = True
+
 ROOT=Path(__file__).resolve().parents[1]
 SCHEMA="ghostmesh.reasonpack.owner-install-preflight.v1"
 SHA40=re.compile(r"^[a-f0-9]{40}$")

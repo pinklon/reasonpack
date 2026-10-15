@@ -42,3 +42,7 @@ A public ReasonPack Reader or actual customer payment is not authorized by any p
 `python3 tests/test-release-preflight.py` exercises exact-commit path generation, source pinning, immutable render contents, nonproduction proposal receipts, dirty/mismatched source denial and rejection of mutable/external CLI references.
 
 Rollback of the source-only proposal is simply discarding this feature branch or its noninstalled review package. An actual installed release demands independently tested host rollback.
+
+## Independent review correction
+
+The first read-only review found that importing source policy modules could create Python bytecode files inside the source worktree, invalidating its clean-checkout requirement. The preflight now disables bytecode writes before any source imports. A separate subprocess test runs the source imports without PYTHONDONTWRITEBYTECODE and verifies that no new repository bytecode files appear. Review package generation remains repeatable against the same unchanged source commit.

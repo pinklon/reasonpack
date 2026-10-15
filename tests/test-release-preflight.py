@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -76,6 +77,18 @@ class ReleaseTests(unittest.TestCase):
         current=(ROOT/"ops/acquisition-supervisor.py").read_text()
         self.assertNotIn('sub.add_parser("launch-real")',current)
         self.assertNotIn('"launch-real"',current)
+    def test_preflight_imports_do_not_mutate_checked_out_source(self):
+        before={x.name for x in (ROOT/"ops"/"__pycache__").glob("*")} if (ROOT/"ops"/"__pycache__").exists() else set()
+        env=os.environ.copy()
+        env.pop("PYTHONDONTWRITEBYTECODE",None)
+        script=("import runpy; m=runpy.run_path("+repr(str(ROOT/"ops/release-preflight.py"))+
+                ",run_name='source_only_readback'); m['review_sources']()")
+        result=subprocess.run([sys.executable,"-c",script],capture_output=True,
+                              text=True,env=env,timeout=6)
+        self.assertEqual(result.returncode,0,result.stderr)
+        after={x.name for x in (ROOT/"ops"/"__pycache__").glob("*")} if (ROOT/"ops"/"__pycache__").exists() else set()
+        self.assertEqual(before,after)
+
     def test_protected_unit_unmodified_in_source(self):
         unit=P.SOURCE_TEMPLATE.read_text()
         self.assertEqual(unit.count("@IMMUTABLE_RELEASE_DIR@"),2)
