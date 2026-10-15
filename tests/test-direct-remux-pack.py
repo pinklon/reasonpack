@@ -158,6 +158,16 @@ class DirectPackTests(unittest.TestCase):
                if c[0]=="yt-dlp" and "--sub-langs" in c]
         self.assertEqual(langs,["en-orig","en"])
 
+    def test_empty_trailing_cues_do_not_claim_full_transcript_coverage(self):
+        caption=(b"WEBVTT\n\n00:00:00.000 --> 00:00:02.000\n"
+                 b"Actual spoken words.\n\n"
+                 b"00:01:55.000 --> 00:02:00.000\n<c></c>\n")
+        out,metadata=M.timed_vtt(caption)
+        self.assertEqual(metadata["source_cue_count"],2)
+        self.assertEqual(metadata["last_caption_second"],2.0)
+        self.assertEqual(out,b"Actual spoken words.\n")
+        self.assertLess(metadata["last_caption_second"],120-max(25,120*0.02))
+
     def test_repeated_speech_after_a_pause_is_preserved(self):
         spoken=(b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nNo\n\n"
                 b"00:00:10.000 --> 00:00:11.000\nNo new taxes\n")

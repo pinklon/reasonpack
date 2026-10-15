@@ -109,7 +109,7 @@ def timed_vtt(raw):
         return incoming
 
     def finish_cue():
-        nonlocal cue_lines,previous_end
+        nonlocal cue_lines,previous_end,latest
         if not cue_lines:
             previous_end=max(previous_end,cue_end)
             return
@@ -121,6 +121,9 @@ def timed_vtt(raw):
         # Remove repeated rolling context only when cues overlap or are
         # nearly adjacent. Speech after a pause must NOT lose a repeated word.
         adjacent=(previous_end>=0 and cue_start<=previous_end+1.0)
+        if current:
+            # Empty/markup-only cues do not prove transcript coverage.
+            latest=max(latest,cue_end)
         fresh=remove_rolling_overlap(spoken,current) if adjacent else current
         if fresh:
             spoken.extend(fresh)
@@ -141,9 +144,8 @@ def timed_vtt(raw):
             previous_start=start
             cue_start=start
             cue_end=endpoint
-            # WebVTT cues may overlap. Coverage is the furthest endpoint,
-            # not the end of the last cue in presentation order.
-            latest=max(latest,endpoint)
+            # Coverage is committed by finish_cue() only after actual
+            # readable caption text has been observed for this cue.
             cues+=1
             active=True
             continue
