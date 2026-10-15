@@ -59,6 +59,8 @@ def main():
         if len(transcript)>MAX_TRANSCRIPT_BYTES:
             fail("source transcript exceeds bounded context, requires segmented custody")
         works=[]
+        if len(args.work)>8:
+            fail("too many public Work sources")
         for path in args.work:
             raw=path.read_bytes()
             if len(raw)>MAX_WORK_BYTES:

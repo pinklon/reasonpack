@@ -90,6 +90,8 @@ def load_analysis(path):
     if not isinstance(claims, list) or not (1 <= len(claims) <= 30):
         fail("reader requires 1-30 claims")
     for claim in claims:
+        if not isinstance(claim, dict):
+            fail("invalid claim object")
         for k in ("timestamp", "statement", "assessment"):
             clean(claim.get(k), 3500)
         time_seconds(claim["timestamp"])
@@ -101,6 +103,8 @@ def load_analysis(path):
         if claim["verdict"] == "supported" and not sources:
             fail("supported claims require independent source citations")
         for src in sources:
+            if not isinstance(src, dict):
+                fail("invalid source object")
             clean(src.get("label"), 180)
             safe_url(src.get("url"))
     thesis = data.get("thesis")
@@ -112,6 +116,8 @@ def load_analysis(path):
     if not isinstance(works, list) or len(works) > 12:
         fail("invalid related Works")
     for work in works:
+        if not isinstance(work, dict):
+            fail("invalid Work citation object")
         clean(work.get("title"), 220)
         u = safe_url(work.get("url"))
         if urlparse(u).hostname != "shareplane.malott.ai":

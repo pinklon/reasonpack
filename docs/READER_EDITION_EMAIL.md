@@ -76,3 +76,11 @@ The implementation has NO email sending, public URL issuance, user permission ch
 
 Local tests: python3 tests/test-reader-edition.py; existing package tests and source verifier.
 Tests passing does NOT imply deployed or commissioned.
+
+## Verified integration point in the currently active mail release (read-only inspection)
+
+The deployed GhostMesh mail package has the authenticated public email entrypoint at integrations/gmail/gm_public_responder.py. The existing validate_public_email() routine verifies sender alignment (DMARC or aligned DKIM), recipient identity, non-bulk/non-automated status, plain-text size, spam state and owner identity where relevant. process_message() then applies admission, deterministic eligibility, durable journal reservation, context/disclosure fencing, tool-free reasoning and exactly-once reply handling.
+
+The existing gm_intake.py is explicitly a correspondence-only owner verifier: operational mail admission is forbidden. Do not alter that invariant to enable ReasonPack. A future ReasonPack adapter belongs AFTER public mail verification and sender-policy admission and MUST preserve journal reservation, retry budget, thread identity, loop defenses and disclosure policy. It should sign a normalized bounded request for a new reasoned-content service, not grant deployment privileges. The same inbound message must not also trigger the ordinary response path while pending asynchronous analysis.
+
+Before integration, compare the specific source release used for the patch to live mail-current and independently verify exact-head tests. Do not edit or restart immutable live releases.
