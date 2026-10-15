@@ -22,7 +22,7 @@ from urllib.parse import urlsplit, parse_qs
 
 ROOT=Path(__file__).resolve().parents[1]
 VIDEO_ID=re.compile(r"^[A-Za-z0-9_-]{11}$")
-TIME=re.compile(r"^(\d\d):(\d\d):(\d\d)\.(\d{3}) -->")
+TIME=re.compile(r"^(\d\d):(\d\d):(\d\d)\.(\d{3}) --> (\d\d):(\d\d):(\d\d)\.(\d{3})(?:\s|$)")
 MEMBERS=("video.mp4","audio.m4a","transcript.txt","transcript-status.json",
          "source.json","ffprobe.json","captions.vtt")
 MAX_SOURCE_JSON=8_000_000
@@ -85,14 +85,25 @@ def timed_vtt(raw):
     text=raw.decode("utf-8-sig",errors="replace")
     if not text.lstrip().startswith("WEBVTT"):hold("caption payload not WebVTT")
     last=None; lines=[]; latest=-1.0; cues=0
-    for line in text.splitlines():
+    rows=text.splitlines()
+    active=False
+    for index,line in enumerate(rows):
         m=TIME.match(line)
         if m:
-            h,minute,sec,milli=(int(x) for x in m.groups())
-            latest=h*3600+minute*60+sec+milli/1000
+            times=[int(x) for x in m.groups()]
+            h,minute,sec,milli=times[4:]
+            endpoint=h*3600+minute*60+sec+milli/1000
+            if endpoint<0 or (latest>=0 and endpoint<latest):
+                hold("out-of-order or invalid caption cue end")
+            latest=endpoint
             cues+=1
+            active=True
             continue
-        if latest<0 or not line.strip() or line.startswith(("Kind:","Language:","NOTE")):
+        # WebVTT cue identifiers occur immediately BEFORE the time line.
+        # Do not mistake them for spoken text in an already-active block.
+        if index+1<len(rows) and TIME.match(rows[index+1]):
+            continue
+        if not active or not line.strip() or line.startswith(("Kind:","Language:","NOTE")):
             continue
         normalized=unescape(re.sub(r"<[^>]*>","",line)).strip()
         normalized=re.sub(r"\s+"," ",normalized)

@@ -101,7 +101,7 @@ class DirectPackTests(unittest.TestCase):
     def test_caption_coverage_and_normalization(self):
         txt,meta=M.timed_vtt(VTT)
         self.assertEqual(meta["source_cue_count"],2)
-        self.assertEqual(meta["last_caption_second"],27)
+        self.assertEqual(meta["last_caption_second"],30.0)
         self.assertIn(b"Another idea.",txt)
         with self.assertRaisesRegex(ValueError,"not WebVTT"):
             M.timed_vtt(b"not captions")
@@ -122,6 +122,18 @@ class DirectPackTests(unittest.TestCase):
         self.assertIn("canonical HTTPS YouTube URL",result.stderr)
         self.assertNotIn("helper not installed",result.stderr)
         self.assertFalse((self.tmp/"should-not-create").exists())
+
+    def test_caption_end_coverage_and_numbered_cue_identifiers(self):
+        cues=(b"WEBVTT\n\n001\n00:00:00.000 --> 00:00:15.000\n"
+              b"Spoken content.\n\nclip-002\n"
+              b"00:01:20.000 --> 00:02:00.000\nFinal sentence.\n")
+        transcript,meta=M.timed_vtt(cues)
+        self.assertEqual(meta["last_caption_second"],120.0)
+        self.assertEqual(meta["source_cue_count"],2)
+        self.assertNotIn(b"001",transcript)
+        self.assertNotIn(b"clip-002",transcript)
+        self.assertEqual(transcript,b"Spoken content.\nFinal sentence.\n")
+        self.assertGreaterEqual(meta["last_caption_second"],120-max(25,120*0.02))
 
     def test_fast_builder_does_not_change_legacy_build(self):
         source=(ROOT/"bin/reasonpack").read_text()
