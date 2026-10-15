@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-VERSION="1.0-refkit.1"
+VERSION="1.0-refkit.2"
 DEFAULT_ROOT="${REASONPACK_ROOT:-$HOME/Desktop/Reasoning Packs}"
 log(){ printf '[reasonpack] %s\n' "$*"; }
 fail(){ printf '[reasonpack] ERROR: %s\n' "$*" >&2; exit "${2:-1}"; }
@@ -93,6 +93,11 @@ PY
   rm -f "$src" "$out/transcript.wav" "$out/transcript.whisper.stderr"; find "$out" -maxdepth 1 -type f -name 'captions*.vtt' ! -name 'captions.vtt' -delete
   python3 - "$out" "$url" <<'PY'
 import json,sys,hashlib,subprocess,os
+def streamsha(p):
+ h=hashlib.sha256()
+ with open(p,'rb',buffering=1024*1024) as f:
+  for part in iter(lambda:f.read(1024*1024),b''):h.update(part)
+ return h.hexdigest()
 out,url=sys.argv[1:]
 def ver(cmd):
  try:
@@ -101,7 +106,7 @@ def ver(cmd):
 m={'schema':'ghostmesh-reasoning-pack-v1','sourceUrl':url,'tools':{x:ver(x) for x in ['yt-dlp','ffmpeg','ffprobe','python3']},'members':[]}
 for name in ['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json','captions.vtt']:
  p=os.path.join(out,name)
- if os.path.isfile(p): m['members'].append({'path':name,'sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'bytes':os.path.getsize(p)})
+ if os.path.isfile(p): m['members'].append({'path':name,'sha256':streamsha(p),'bytes':os.path.getsize(p)})
 open(os.path.join(out,'manifest.json'),'w').write(json.dumps(m,indent=2)+'\n')
 PY
   (cd "$out" && python3 - <<'PY' > .members
@@ -116,15 +121,56 @@ PY
 verify(){
   local out="$1"; need python3; [[ -d "$out" && -s "$out/manifest.json" && -s "$out/SHA256SUMS.txt" ]] || return 40
   python3 - "$out" <<'PY'
-import json,sys,os,hashlib
-root=sys.argv[1]; m=json.load(open(os.path.join(root,'manifest.json'))); assert m.get('schema')=='ghostmesh-reasoning-pack-v1'
-entries=m.get('members',[]); paths={e['path'] for e in entries}; required={'video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json'}; assert required <= paths
+import json,sys,os,hashlib,re
+root=sys.argv[1]
+def streamsha(p):
+ h=hashlib.sha256()
+ with open(p,'rb',buffering=1024*1024) as f:
+  for part in iter(lambda:f.read(1024*1024),b''):h.update(part)
+ return h.hexdigest()
+def safe_name(name):
+ return (isinstance(name,str) and len(name)<=128 and
+         re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*',name) is not None and
+         name not in ('manifest.json','SHA256SUMS.txt'))
+assert os.path.isdir(root) and not os.path.islink(root), 'invalid pack root'
+manifest=os.path.join(root,'manifest.json')
+inventory=os.path.join(root,'SHA256SUMS.txt')
+assert not os.path.islink(manifest) and not os.path.islink(inventory), 'linked metadata'
+assert os.path.getsize(manifest)<2_000_000 and os.path.getsize(inventory)<2_000_000, 'oversized metadata'
+with open(manifest,encoding='utf-8') as f:m=json.load(f)
+assert m.get('schema')=='ghostmesh-reasoning-pack-v1', 'unsupported pack schema'
+entries=m.get('members')
+assert isinstance(entries,list) and entries, 'empty members'
+paths=[]
 for e in entries:
- p=os.path.join(root,e['path']); assert os.path.isfile(p) and os.path.getsize(p)>0; assert os.path.getsize(p)==e['bytes']; assert hashlib.sha256(open(p,'rb').read()).hexdigest()==e['sha256']
-allowed=paths|{'manifest.json','SHA256SUMS.txt'}; actual={n for n in os.listdir(root) if os.path.isfile(os.path.join(root,n))}; assert actual==allowed, f'untracked pack members: {sorted(actual-allowed)}; missing: {sorted(allowed-actual)}'
-for line in open(os.path.join(root,'SHA256SUMS.txt')):
- expected,name=line.rstrip('\n').split('  ',1); p=os.path.join(root,name); assert os.path.isfile(p); assert hashlib.sha256(open(p,'rb').read()).hexdigest()==expected
+ assert isinstance(e,dict) and safe_name(e.get('path')), 'unsafe member name'
+ name=e['path']
+ assert name not in paths, 'duplicate member'
+ paths.append(name)
+pathset=set(paths)
+required={'video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json'}
+assert required<=pathset, 'required members missing'
+for e in entries:
+ p=os.path.join(root,e['path'])
+ assert os.path.isfile(p) and not os.path.islink(p), 'missing or linked member'
+ assert os.path.getsize(p)>0 and os.path.getsize(p)==e['bytes'], 'invalid source member size'
+ assert streamsha(p)==e['sha256'], 'source member checksum failure'
+allowed=pathset|{'manifest.json','SHA256SUMS.txt'}
+actual=set(os.listdir(root))
+assert actual==allowed, 'unexpected or missing pack members'
+seen=set()
+with open(inventory,encoding='utf-8') as f:
+ for line in f:
+  expected,name=line.rstrip('\n').split('  ',1)
+  assert name in allowed and name not in seen, 'duplicate or untracked checksum member'
+  seen.add(name)
+  p=os.path.join(root,name)
+  assert os.path.isfile(p) and not os.path.islink(p), 'linked inventory member'
+  assert re.fullmatch(r'[0-9a-f]{64}',expected), 'invalid digest format'
+  assert streamsha(p)==expected, 'inventory checksum failure'
+assert seen==allowed-{'SHA256SUMS.txt'}, 'incomplete inventory'
 print('PASS reasoning pack verification')
+
 PY
 }
 self_test(){
@@ -133,13 +179,18 @@ self_test(){
   for f in video.mp4 audio.m4a transcript.txt transcript-status.json source.json ffprobe.json; do printf 'fixture-%s\n' "$f" > "$td/$f"; done
   python3 - "$td" <<'PY'
 import hashlib,json,os,sys
+def streamsha(p):
+ h=hashlib.sha256()
+ with open(p,'rb',buffering=1024*1024) as f:
+  for part in iter(lambda:f.read(1024*1024),b''):h.update(part)
+ return h.hexdigest()
 root=sys.argv[1]; names=['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json']; members=[]
 for name in names:
- p=os.path.join(root,name); members.append({'path':name,'sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'bytes':os.path.getsize(p)})
+ p=os.path.join(root,name); members.append({'path':name,'sha256':streamsha(p),'bytes':os.path.getsize(p)})
 open(os.path.join(root,'manifest.json'),'w').write(json.dumps({'schema':'ghostmesh-reasoning-pack-v1','sourceUrl':'https://www.youtube.com/watch?v=fixture','tools':{},'members':members},indent=2)+'\n')
 with open(os.path.join(root,'SHA256SUMS.txt'),'w') as out:
  for name in names+['manifest.json']:
-  p=os.path.join(root,name); out.write(hashlib.sha256(open(p,'rb').read()).hexdigest()+'  '+name+'\n')
+  p=os.path.join(root,name); out.write(streamsha(p)+'  '+name+'\n')
 PY
   verify "$td" >/dev/null; printf 'untracked\n' > "$td/extra.tmp"; if verify "$td" >/dev/null 2>&1; then return 91; fi; echo 'PASS reasonpack self-test'
 }

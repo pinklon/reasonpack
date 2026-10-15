@@ -1,8 +1,8 @@
 {
   "schemaVersion": "reasonpack-reference-kit.v1",
   "name": "ReasonPack Professional Reference Kit",
-  "version": "1.1-refkit.1",
-  "runtimeVersion": "1.0-refkit.1",
+  "version": "1.1-refkit.2",
+  "runtimeVersion": "1.0-refkit.2",
   "created": "2026-09-10",
   "posture": "reference-distribution-candidate",
   "purpose": "Working ReasonPack utility plus reference-quality engineering/product handoff.",
@@ -15,7 +15,7 @@
   },
   "referenceRuntime": {
     "path": "bin/reasonpack",
-    "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef",
+    "sha256": "2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1",
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
@@ -44,8 +44,8 @@
     },
     {
       "path": "bin/reasonpack",
-      "bytes": 10279,
-      "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef"
+      "bytes": 11829,
+      "sha256": "2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1"
     },
     {
       "path": "bin/rp",
