@@ -83,9 +83,19 @@ class ContainmentTests(unittest.TestCase):
         self.assertNotIn("/runtime/reasonpack/current",self.unit)
         self.assertIn("ReadWritePaths=/srv/ghostmesh/workspaces/runs/reasonpack-jobs/%i",self.unit)
 
+    def test_owner_prestart_is_one_exact_audited_root_command(self):
+        self.assertIn("ExecStartPre=+/usr/bin/python3 @IMMUTABLE_RELEASE_DIR@/ops/acquisition-owner-prestart.py --job-id %i",self.unit)
+        for replacement in ("ExecStartPre=+/bin/sh",
+                            "ExecStartPre=/usr/bin/python3",
+                            "ExecStartPre=-+/usr/bin/python3"):
+            with self.subTest(replacement=replacement),self.assertRaisesRegex(
+                    ValueError,"one-time grant claim"):
+                C.verify_install_contract(self.unit.replace(
+                  "ExecStartPre=+/usr/bin/python3",replacement))
     def test_never_add_second_listener_or_email_dispatch_to_unit(self):
-        for forbidden in ("ghostmesh-commons-responder","gmail","slack","mail-current","ExecStartPre=","ExecStopPost="):
+        for forbidden in ("ghostmesh-commons-responder","gmail","slack","mail-current","ExecStopPost="):
             self.assertNotIn(forbidden,self.unit)
+        self.assertEqual(self.unit.count("ExecStartPre="),1)
         self.assertNotIn("Delegate=yes",self.unit)
 
 if __name__=="__main__":unittest.main(verbosity=2)

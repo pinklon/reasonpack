@@ -91,8 +91,10 @@ def render(commit):
     expected="ExecStart=/usr/bin/python3 "+str(target)+"/ops/acquisition-cgroup-runner.py --job-id %i"
     if expected not in text or "WorkingDirectory="+str(target) not in text:
         deny("release service executable not bound to exact source revision")
-    if text.count(str(target))!=2:
-        deny("unexpected substitution scope in service")
+    expected_pre=("ExecStartPre=+/usr/bin/python3 "+str(target)
+          +"/ops/acquisition-owner-prestart.py --job-id %i")
+    if expected_pre not in text or text.count(str(target))!=3:
+        deny("immutable owner grant claim path is not bound to the release")
     return text
 
 def git_revision():

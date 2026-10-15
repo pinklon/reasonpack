@@ -84,7 +84,7 @@ def validate_payload(raw,*,admission_raw,supervision,release_commit,now=None):
     return {"job_id":g["job_id"],"grant_sha256":hashbytes(raw),
             "source_admission_sha256":g["admission_sha256"],
             "signed_gateway_sha256":g["signed_gateway_sha256"],
-            "release_commit":release_commit,
+            "release_commit":release_commit,"nonce":g["nonce"],
             "scope":g["scope"],"expires_at_utc":g["expires_at_utc"],
             "launch_authorized":False}
 
