@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "ghostmesh.reasonpack.workflow.v1"
 STATES = ("admitted", "source-verified", "awaiting-research",
-          "analysis-unreviewed", "reader-private-draft", "email-private-draft")
+          "research-evidence-verified", "analysis-unreviewed",
+          "reader-private-draft", "email-private-draft")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
@@ -184,28 +185,89 @@ def prepare_research(args):
     finally:
         os.close(fd)
 
-def ingest_analysis(args):
+def collect_evidence(args):
     fd = lock_job(args.job)
     try:
         flow = state(args.job, "awaiting-research")
         verify_source_unchanged(args.job)
+        research_input = args.job / "research-input.json"
+        expected = flow["events"][-1]["evidence"]["research_packet_sha256"]
+        if digest(research_input.read_bytes()) != expected:
+            reject("research input changed before evidence admission")
+        script = import_script("research-evidence")
+        record = script.verified_register(args.registry, research_input)
+        raw = args.registry.read_bytes()
+        protect_write(args.job / "research-evidence.json", raw)
+        return advance(args.job, flow, "research-evidence-verified",
+                       {"evidence_registry_sha256": digest(raw),
+                        "registered_sources": len(record["sources"]),
+                        "independent_semantic_review": "NOT_PERFORMED"})
+    finally:
+        os.close(fd)
+
+def prepare_model(args):
+    fd = lock_job(args.job)
+    try:
+        state(args.job, "research-evidence-verified")
+        verify_source_unchanged(args.job)
+        command=[sys.executable,str(ROOT/"ops/research-composer.py"),"prepare",
+                 "--packet",str(args.job/"research-input.json"),
+                 "--registry",str(args.job/"research-evidence.json"),
+                 "--out",str(args.job/"composition")]
+        execute(command)
+        receipt=data(args.job/"composition"/"composition-receipt.json")
+        if receipt.get("status")!="model-input-ready-not-invoked":
+            reject("model handoff failed")
+        return {"status":"research-prompt-ready","job":state(args.job)["job_id"],
+                "model_invoked":False,"receipt":str(args.job/"composition"/"composition-receipt.json")}
+    finally:
+        os.close(fd)
+
+def ingest_analysis(args):
+    fd = lock_job(args.job)
+    try:
+        flow = state(args.job, "research-evidence-verified")
+        verify_source_unchanged(args.job)
         if not (args.job / "research-input.json").is_file():
             reject("missing research handoff")
-        expected = flow["events"][-1]["evidence"]["research_packet_sha256"]
+        expected = flow["events"][-2]["evidence"]["research_packet_sha256"]
         if digest((args.job / "research-input.json").read_bytes()) != expected:
             reject("research input has changed")
+        registry = args.job / "research-evidence.json"
+        if digest(registry.read_bytes()) != flow["events"][-1]["evidence"]["evidence_registry_sha256"]:
+            reject("evidence registry changed after validation")
+        composition=data(args.job/"composition"/"composition-receipt.json")
+        if composition.get("status")!="model-input-ready-not-invoked":
+            reject("bounded composition not prepared")
+        if (composition.get("research_packet_sha256")!=digest((args.job/"research-input.json").read_bytes())
+                or composition.get("evidence_registry_sha256")!=digest(registry.read_bytes())
+                or composition.get("model_prompt_sha256")!=digest((args.job/"composition"/"model-prompt.json").read_bytes())
+                or composition.get("model_schema_sha256")!=digest((args.job/"composition"/"analysis-schema.json").read_bytes())):
+            reject("prepared model context has changed")
         raw = args.analysis.read_bytes()
+        validation_path=args.job/"research-validation-receipt.json"
+        execute([sys.executable,str(ROOT/"ops/research-composer.py"),"validate",
+                 "--packet",str(args.job/"research-input.json"),
+                 "--registry",str(registry),
+                 "--candidate",str(args.analysis),
+                 "--out",str(validation_path)])
+        if data(validation_path).get("semantic_review")!="NOT_ATTESTED":
+            reject("machine-generated research cannot self-attest")
         if len(raw)>400_000:
             reject("analysis too large")
         analysis=json.loads(raw)
         mod=import_script("reader-edition")
         mod.load_analysis(args.analysis)
+        research = import_script("research-evidence")
+        corroboration = research.assert_supported_claims(analysis, research.verified_register(registry, args.job / "research-input.json"))
         if analysis.get("video_id") != flow["video_id"]:
             reject("wrong video in analysis")
         # Provenance is not equivalent to editorial verification; HOLD is retained.
         protect_write(args.job / "analysis-unreviewed.json", raw)
         return advance(args.job, flow, "analysis-unreviewed",
-                       {"analysis_sha256": digest(raw), "editorial_review": "required"})
+                       {"analysis_sha256": digest(raw), "editorial_review": "required",
+                        "citation_register_bound": corroboration["bound_citations"],
+                        "semantic_source_review": "NOT_ATTESTED"})
     finally:
         os.close(fd)
 
@@ -254,6 +316,8 @@ def main():
     initp = sub.add_parser("init"); initp.add_argument("--admission", type=Path, required=True); initp.add_argument("--root", type=Path, required=True)
     source = sub.add_parser("source"); source.add_argument("--job", type=Path, required=True); source.add_argument("--pack", type=Path, required=True)
     research = sub.add_parser("research"); research.add_argument("--job", type=Path, required=True); research.add_argument("--public-work", type=Path, action="append", default=[])
+    evidence = sub.add_parser("evidence"); evidence.add_argument("--job",type=Path,required=True); evidence.add_argument("--registry",type=Path,required=True)
+    model = sub.add_parser("compose"); model.add_argument("--job", type=Path, required=True)
     analysis = sub.add_parser("analysis"); analysis.add_argument("--job", type=Path, required=True); analysis.add_argument("--analysis", type=Path, required=True)
     read = sub.add_parser("render"); read.add_argument("--job", type=Path, required=True)
     draftp = sub.add_parser("draft"); draftp.add_argument("--job", type=Path, required=True); draftp.add_argument("--from-email", required=True)
@@ -263,6 +327,8 @@ def main():
         if args.step == "init": result=init(args)
         elif args.step == "source": result=verify_source(args)
         elif args.step == "research": result=prepare_research(args)
+        elif args.step == "evidence": result=collect_evidence(args)
+        elif args.step == "compose": result=prepare_model(args)
         elif args.step == "analysis": result=ingest_analysis(args)
         elif args.step == "render": result=render(args)
         elif args.step == "draft": result=draft(args)

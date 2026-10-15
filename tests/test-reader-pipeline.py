@@ -87,6 +87,21 @@ class PipelineTests(unittest.TestCase):
                    "--allow-sender",self.sender,"--out",self.jobs)
         self.assertEqual(r.returncode,0,r.stderr)
         return next(self.jobs.rglob("*.json"))
+    def evidence_for(self,job):
+        packet=json.loads((job/"research-input.json").read_text())
+        excerpt="Synthetic regression source excerpt. Does not establish actual video claims."
+        registry={"schema":"ghostmesh.reasonpack.evidence.v1",
+                  "source_manifest_sha256":packet["source_manifest_sha256"],
+                  "transcript_sha256":packet["transcript_sha256"],
+                  "sources":[{"id":"src-syn0001",
+                              "url":"https://www.anthropic.com/research/emotion-concepts-function",
+                              "title":"Synthetic research locator for integration test",
+                              "publisher":"Test fixture only", "evidence_type":"primary",
+                              "excerpt":excerpt, "excerpt_sha256":hashed(excerpt.encode()),
+                              "retrieved_at_utc":datetime.now(timezone.utc).isoformat()}]}
+        path=self.root/"research-sources.json"
+        path.write_text(json.dumps(registry))
+        return path
     def init(self):
         item=self.admission()
         r=self.cli("reader-pipeline.py","init","--admission",item,"--root",self.pipeline)
@@ -100,6 +115,9 @@ class PipelineTests(unittest.TestCase):
         job=self.init()
         self.assertEqual(self.progress(job,"source","--pack",self.pack)["state"],"source-verified")
         self.assertEqual(self.progress(job,"research")["state"],"awaiting-research")
+        registry=self.evidence_for(job)
+        self.assertEqual(self.progress(job,"evidence","--registry",registry)["state"],"research-evidence-verified")
+        self.assertFalse(self.progress(job,"compose")["model_invoked"])
         self.assertEqual(self.progress(job,"analysis","--analysis",self.analysis)["state"],"analysis-unreviewed")
         self.assertEqual(self.progress(job,"render")["state"],"reader-private-draft")
         self.assertEqual(self.progress(job,"draft","--from-email","ghostmesh@example.org")["state"],"email-private-draft")
@@ -110,7 +128,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(any(x.get_filename()=="GhostMesh-ReasonPack-Reader.html" for x in msg.walk()))
         flow=json.loads((job/"workflow.json").read_text())
         self.assertEqual([v["to"] for v in flow["events"]],
-                        ["source-verified","awaiting-research","analysis-unreviewed","reader-private-draft","email-private-draft"])
+                        ["source-verified","awaiting-research","research-evidence-verified","analysis-unreviewed","reader-private-draft","email-private-draft"])
         self.assertFalse(flow["publication_authority"])
         self.assertFalse(flow["dispatch_authority"])
         self.assertTrue(all(x["evidence"] for x in flow["events"]))
@@ -135,8 +153,34 @@ class PipelineTests(unittest.TestCase):
         self.progress(job,"research")
         p=job/"research-input.json"
         p.write_text(p.read_text()+"\n")
-        self.assertEqual(self.cli("reader-pipeline.py","analysis","--job",job,"--analysis",self.analysis).returncode,2)
+        self.assertEqual(self.cli("reader-pipeline.py","evidence","--job",job,"--registry",self.evidence_for(job)).returncode,2)
         self.assertEqual(json.loads((job/"workflow.json").read_text())["state"],"awaiting-research")
+
+    def test_unregistered_source_holds_supported_claim(self):
+        job=self.init()
+        self.progress(job,"source","--pack",self.pack)
+        self.progress(job,"research")
+        r=self.evidence_for(job)
+        self.progress(job,"evidence","--registry",r)
+        self.progress(job,"compose")
+        sample=json.loads(self.analysis.read_text())
+        sample["claims"][0]["verdict"]="supported"
+        sample["claims"][0]["sources"]=[{"label":"Fabricated", "url":"https://example.com/nonexistent"}]
+        self.analysis.write_text(json.dumps(sample))
+        result=self.cli("reader-pipeline.py","analysis","--job",job,"--analysis",self.analysis)
+        self.assertEqual(result.returncode,2)
+        self.assertIn("unregistered evidence URL",result.stderr)
+        self.assertEqual(json.loads((job/"workflow.json").read_text())["state"],"research-evidence-verified")
+
+    def test_source_registry_tampering_holds_analysis(self):
+        job=self.init()
+        self.progress(job,"source","--pack",self.pack)
+        self.progress(job,"research")
+        self.progress(job,"evidence","--registry",self.evidence_for(job))
+        self.progress(job,"compose")
+        with (job/"research-evidence.json").open("a") as f:f.write(" ")
+        self.assertEqual(self.cli("reader-pipeline.py","analysis","--job",job,"--analysis",self.analysis).returncode,2)
+        self.assertEqual(json.loads((job/"workflow.json").read_text())["state"],"research-evidence-verified")
 
     def test_duplicate_idempotency_and_mutated_request_rejected(self):
         job=self.init()
