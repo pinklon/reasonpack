@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import shutil
+import stat
 
 # Imports from the reviewed source tree must not create bytecode and
 # invalidate the very clean-checkout identity this tool is checking.
@@ -25,7 +26,9 @@ ROOT=Path(__file__).resolve().parents[1]
 SCHEMA="ghostmesh.reasonpack.owner-install-preflight.v1"
 SHA40=re.compile(r"^[a-f0-9]{40}$")
 SHA64=re.compile(r"^[a-f0-9]{64}$")
-RELEASE_ROOT=Path("/srv/ghostmesh/workspaces/runtime/reasonpack/releases")
+# Every ancestor of this path must be root-controlled; unlike the mutable
+# ghostmesh-owned /srv/.../workspaces/runtime, /opt is a root-owned anchor.
+RELEASE_ROOT=Path("/opt/ghostmesh/reasonpack/releases")
 SOURCE_TEMPLATE=ROOT/"ops/systemd/ghostmesh-reasonpack-acquire@.service"
 WORKER=ROOT/"ops/acquisition-real-worker.py"
 CLI=ROOT/"bin/reasonpack"
@@ -33,9 +36,27 @@ CLI=ROOT/"bin/reasonpack"
 def deny(message):raise ValueError(message)
 def sha(data):return sha256(data).hexdigest()
 
+def verify_root_owned_anchor():
+    """No release under a service-user writable or symlinked parent."""
+    if RELEASE_ROOT != Path("/opt/ghostmesh/reasonpack/releases"):
+        deny("release root cannot move outside reviewed root-owned prefix")
+    for parent in (Path("/opt"), Path("/opt/ghostmesh"),
+                   Path("/opt/ghostmesh/reasonpack"), RELEASE_ROOT):
+        try:
+            info=parent.lstat()
+        except FileNotFoundError:
+            # Preflight precedes owner creation. No installation is attempted.
+            continue
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or
+            info.st_mode & 0o022):
+            deny("non-root-owned, symlinked or writable release ancestor: "+str(parent))
+    return True
+
 def release_path(commit):
     if not isinstance(commit,str) or not SHA40.fullmatch(commit):
         deny("exact 40-hex reviewed source commit required")
+    # Rendering is portable and deterministic; host safety is checked by
+    # build() before it emits an owner-usable preflight proposal.
     return RELEASE_ROOT/commit
 
 def module(path,name):
@@ -89,6 +110,7 @@ def build(commit,out):
     source=git_revision()
     if source!=commit:deny("checked-out source is not exact owner-reviewed commit")
     if out.exists() or out.is_symlink():deny("preflight output already exists")
+    verify_root_owned_anchor()
     text=render(commit)
     out.parent.mkdir(parents=True,exist_ok=True)
     stage=Path(tempfile.mkdtemp(prefix=".reasonpack-release-preflight-",dir=out.parent))

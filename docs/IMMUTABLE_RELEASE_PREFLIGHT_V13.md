@@ -12,7 +12,7 @@ The new `ops/release-preflight.py` prepares an owner-inspectable proposal. It:
 - Requires a completely clean Git worktree and an explicitly supplied exact 40-hex HEAD, refusing aliases like `main` or `HEAD` and refusing any changed or untracked files.
 - Confirms that worker's CLI path is within the same release and its embedded CLI SHA matches the local binary.
 - Validates the source-only systemd template with its fixed instance controls and checks the unmanaged `launch-real` path is absent.
-- Renders the exact unit referencing a future immutable path `/srv/ghostmesh/workspaces/runtime/reasonpack/releases/<commit40>`. It never resolves to a mutable `current` symlink.
+- Renders the exact unit referencing a future immutable path `/opt/ghostmesh/reasonpack/releases/<commit40>`. It never resolves to a mutable `current` symlink.
 - Emits `ghostmesh-reasonpack-acquire@.service` and `preflight-receipt.json` into a private, atomic output directory, bound to the exact commit and SHA-256 of the unit, CLI, worker and runner.
 - Leaves `installer_executed=false`, `systemd_unit_installed=false`, `worker_started=false`, `network_requested=false`, `owner_authorization_bound_to_hash=false`, `cgroup_kill_witness=NOT_ATTESTED` and `rollback_witness=NOT_ATTESTED`.
 
@@ -46,3 +46,20 @@ Rollback of the source-only proposal is simply discarding this feature branch or
 ## Independent review correction
 
 The first read-only review found that importing source policy modules could create Python bytecode files inside the source worktree, invalidating its clean-checkout requirement. The preflight now disables bytecode writes before any source imports. A separate subprocess test runs the source imports without PYTHONDONTWRITEBYTECODE and verifies that no new repository bytecode files appear. Review package generation remains repeatable against the same unchanged source commit.
+
+## Root-controlled release path correction
+
+A live host path inspection found that /srv/ghostmesh/workspaces/runtime is
+owned and writable by the ghostmesh service account. A root-owned nested
+release directory under that parent would remain replaceable by that account,
+so it cannot be treated as immutable. This source branch instead anchors the
+future owner-installed release in **/opt/ghostmesh/reasonpack/releases**,
+beneath a root-controlled /opt. The preflight rejects existing symlinked,
+non-root-owned or group/world-writable ancestor directories. It accepts
+absent descendant directories only because it does not create or install them.
+The privileged owner installer must create each as root-owned and reverify
+all components before publishing any unit.
+
+## Hosted CI portability correction
+
+GitHub-hosted test runners may have an `/opt` directory owned by the runner rather than root. Pure unit rendering and candidate-schema checks therefore remain portable and deterministic, while the real preflight `build()` explicitly performs the host-side root-ownership check before generating an operator review package. A negative test simulates an unsafe `/opt` and ensures no review package is written. The check is never skipped on an actual operator preflight.
