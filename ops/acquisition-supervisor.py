@@ -192,6 +192,8 @@ def observe(jobdir):
     running=live(s)
     if s["status"]=="registered":
         classification="registered-no-worker"
+    elif s["status"]=="launch-intent-uncertain":
+        classification="reconciliation-required-launch-uncertain"
     elif running and completion:
         classification="completion-reported-process-still-running"
     elif running and s.get("last_progress_sequence"):
@@ -227,6 +229,15 @@ def start_fixture(jobdir,ticks,period_ms):
         if s["status"]!="registered" or s["attempts"]!=0:fail("fixture already launched or state not registered")
         child=ROOT/"ops/acquisition-synthetic-worker.py"
         if not child.is_file():fail("fixed synthetic worker missing")
+        # Durable intent BEFORE log-file or subprocess side effects. Even if
+        # the launcher dies on Popen, the next observer sees an uncertain
+        # attempt and cannot quietly dispatch duplicate work.
+        s.update(status="launch-intent-uncertain",worker_kind="synthetic-only",
+                 worker_command_verified=False,attempts=1,
+                 work_started_at=utc(),
+                 last_observation="launch claimed; PID/start identity not yet durably established")
+        atomic(jobdir/"supervision.json",
+               (json.dumps(s,indent=2,sort_keys=True)+"\n").encode(),replace=True)
         readfd,writefd=os.pipe()
         out=open(jobdir/"fixture.stdout","xb",buffering=0)
         err=open(jobdir/"fixture.stderr","xb",buffering=0)

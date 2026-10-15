@@ -180,6 +180,30 @@ class DurableTests(unittest.TestCase):
         self.assertEqual(self.observe()["status"],"registered-no-worker")
         self.assertEqual(before,set(self.job.iterdir()))
         self.assertFalse((self.job/"synthetic-completion.json").exists())
+    def test_launch_log_collision_is_reconciliation_required_not_fresh(self):
+        self.assertEqual(self.register().returncode,0)
+        (self.job/"fixture.stdout").write_bytes(b"preexisting partial log")
+        failed=self.launch(ticks=4,period=40)
+        self.assertEqual(failed.returncode,2)
+        self.assertEqual(self.observe()["status"],"reconciliation-required-launch-uncertain")
+        self.assertFalse(self.observe()["automatic_restart_authorized"])
+        self.assertEqual(self.launch().returncode,2)
+
+    def test_subprocess_spawn_failure_retains_durable_attempt(self):
+        from unittest import mock
+        import importlib.util
+        spec=importlib.util.spec_from_file_location("supervisor_spawn_test",
+              ROOT/"ops/acquisition-supervisor.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(self.register().returncode,0)
+        with mock.patch.object(module.subprocess,"Popen",side_effect=OSError("synthetic spawn failure")):
+            with self.assertRaisesRegex(OSError,"spawn failure"):
+                module.start_fixture(self.job,2,10)
+        self.assertEqual(self.observe()["status"],"reconciliation-required-launch-uncertain")
+        self.assertFalse(self.observe()["synthetic_completion_reported"])
+        self.assertEqual(self.launch().returncode,2)
+
     def test_forged_heartbeat_cannot_change_process_identity(self):
         self.assertEqual(self.register().returncode,0)
         self.assertEqual(self.launch(ticks=12,period=90).returncode,0)

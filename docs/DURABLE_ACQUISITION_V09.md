@@ -59,3 +59,7 @@ Initial independent read-only review of this implementation found two P2 defects
 The supervisor now checks process state alongside PID/start ticks, excluding Z/X/x. Registration builds both private exact receipts in a sibling directory, fsyncs them, atomically renames into the canonical job name, then fsyncs the queue directory; crash before publication leaves no partial canonical job. Focused regressions cover zombies and interruption before publication, with successful retry after the simulated failure.
 
 The worker's heartbeat and terminal marker remain **self-reported synthetic evidence**, not independent provider or acquisition attestation.
+
+## Launch-intent failure recovery
+
+The second read-only review found one remaining P2: interrupted log creation or Popen could strand a job that still looked unattempted. The launcher now durably publishes \`launch-intent-uncertain\` and increments the attempt counter **before any log or worker side effect**. A failed spawn, process interruption or log collision is reported as \`reconciliation-required-launch-uncertain\`. No automatic retry of this uncertain attempt is allowed. Separate negative tests inject Popen failure and a preexisting log file to prove the invariant.
