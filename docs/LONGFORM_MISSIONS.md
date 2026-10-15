@@ -52,3 +52,12 @@ A website mission especially requires scoped hosting, domain/DNS authority, cust
 - Maintain separate server-side authenticated user-specific previews, quote acceptance and payment ledger only after terms and privacy/security approval.
 - Owner-only end-to-end real Gmail request canary with one journal reservation, job/telemetry lineage, one provider-backed send and readback. Gmail acceptance is not inbox arrival.
 - All source changes must pass hosted exact-head CI and independent review before merge. Public release requires owner approval of exact content SHA.
+
+## Independent source review repairs
+
+The first read-only PR review found two P2 problems: segmented model inputs advertised the whole-video output schema, and unbounded \`readline()\` could exhaust memory on a newline-free subtitle export. Both are repaired in source before publishing this PR:
+
+- Each segment now carries its **own** SHA-pinned \`ghostmesh.reasonpack.segment-candidate.v1\` JSON output schema, with its exact segment index and input/prompt digests. \`segment-progress.py\` rejects modified or missing schema files. Whole-video \`analysis.v1\` output remains a separate, later synthesis task.
+- The segmenter now reads at most 4096 UTF-8 characters per source operation, encodes codepoint-safe byte pieces, and appends bounded slices. It no longer loads a whole newline-free transcript into memory. A large synthetic single-line/Unicode transcript and 180-minute/260-minute cases are tested.
+
+No per-video duration cutoff was added. Only work-unit resources are bounded. A reviewed final all-segment synthesis mechanism remains unimplemented, so the segmented source cannot be silently released as a complete video verdict.

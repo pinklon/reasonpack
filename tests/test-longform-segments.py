@@ -140,6 +140,12 @@ class LongFormTests(unittest.TestCase):
             self.assertEqual(payload["bounded_evidence"]["segment_identity"]["index"],part["index"])
             self.assertLess(path.stat().st_size,180_000)
             self.assertEqual(sha(path.read_bytes()),part["prompt_sha256"])
+            contract=output/"segment-schemas"/part["schema_path"]
+            self.assertEqual(sha(contract.read_bytes()),part["schema_sha256"])
+            spec=json.loads(contract.read_text())
+            self.assertEqual(spec["properties"]["schema"]["enum"],
+                             ["ghostmesh.reasonpack.segment-candidate.v1"])
+            self.assertEqual(spec["properties"]["segment_index"]["enum"],[part["index"]])
         checkpoint=self.t/"staged-segment-candidates"
         status=run("segment-progress.py","status","--composition",output,"--results",checkpoint)
         self.assertEqual(status.returncode,0,status.stderr)
@@ -181,6 +187,25 @@ class LongFormTests(unittest.TestCase):
         p=self.build()
         self.assertEqual(p.returncode,0,p.stderr)
         self.assertGreater(json.loads(p.stdout)["count"],25)
+
+    def test_large_newline_free_transcript_remains_bounded_and_exact(self):
+        # An hours-long subtitle export may contain no newline boundaries.
+        raw=("[00:00:00] "+("💠ABCD"*250_000)).encode("utf-8")
+        (self.pack/"transcript.txt").write_bytes(raw)
+        m=json.loads((self.pack/"manifest.json").read_text())
+        for member in m["members"]:
+            if member["path"]=="transcript.txt":
+                member["bytes"]=len(raw)
+                member["sha256"]=sha(raw)
+        (self.pack/"manifest.json").write_text(json.dumps(m,indent=2)+"\n")
+        members=[row["path"] for row in m["members"]]+["manifest.json"]
+        (self.pack/"SHA256SUMS.txt").write_text("".join(
+            sha((self.pack/name).read_bytes())+"  "+name+"\n" for name in members))
+        r=self.build(target=16000)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertGreater(json.loads(r.stdout)["count"],40)
+        self.assertEqual(run("longform-segments.py","verify","--transcript",self.pack/"transcript.txt",
+                    "--segments",self.parts).returncode,0)
 
     def test_no_segments_means_clear_hold_not_duration_rejection(self):
         p=run("editorial-packet.py","--pack",self.pack,"--out",self.t/"missing.json")

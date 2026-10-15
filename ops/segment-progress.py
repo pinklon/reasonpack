@@ -32,6 +32,12 @@ def load_composition(folder):
         payload=(folder/"segment-prompts"/row["path"])
         if payload.is_symlink() or digest(payload.read_bytes())!=row["prompt_sha256"]:
             deny("segment prompt changed after preparation")
+        expected_schema=f"segment-{i:06d}.schema.json"
+        if row.get("schema_path")!=expected_schema or not SHA.fullmatch(row.get("schema_sha256","")):
+            deny("missing per-segment output contract")
+        schema=folder/"segment-schemas"/expected_schema
+        if schema.is_symlink() or digest(schema.read_bytes())!=row["schema_sha256"]:
+            deny("per-segment output schema changed")
     return r,parts
 
 def check_candidate(record,entry):

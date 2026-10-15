@@ -74,13 +74,15 @@ def emit_segments(transcript,directory,target):
             chunk.extend(piece[:cut])
             piece=piece[cut:]
             emit()
-    with transcript.open("rb") as fp:
-        while line:=fp.readline():
-            totalhash.update(line)
-            # Keep complete lines together unless larger than the segment budget.
-            if chunk and len(chunk)+len(line)>target:
-                emit()
-            append(line)
+    # Fixed-size text reads avoid unbounded readline() on a single giant
+    # subtitle line and ensure each encoded piece begins/ends at UTF-8
+    # codepoint boundaries. Repeated byte slicing is bounded by 4096 * 4
+    # bytes rather than the total transcript size.
+    with transcript.open("r",encoding="utf-8",newline="") as fp:
+        while text:=fp.read(4096):
+            piece=text.encode("utf-8")
+            totalhash.update(piece)
+            append(piece)
     emit()
     if not names:refuse("empty transcript")
     return names,offset,totalhash.hexdigest()

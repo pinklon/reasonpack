@@ -81,6 +81,21 @@ def schema():
                 "shareplane_works":{"type":"array","maxItems":12,"items":work}
             }}
 
+def segment_candidate_schema(index,segment_sha,prompt_sha):
+    text={"type":"string","minLength":1,"maxLength":2200}
+    return {"type":"object","additionalProperties":False,
+            "required":["schema","segment_index","segment_sha256","prompt_sha256",
+                        "observations","source_truth_attested","final_answer_authorized"],
+            "properties":{
+                "schema":{"type":"string","enum":["ghostmesh.reasonpack.segment-candidate.v1"]},
+                "segment_index":{"type":"integer","enum":[index]},
+                "segment_sha256":{"type":"string","enum":[segment_sha]},
+                "prompt_sha256":{"type":"string","enum":[prompt_sha]},
+                "observations":{"type":"array","minItems":1,"maxItems":18,"items":text},
+                "source_truth_attested":{"type":"boolean","enum":[False]},
+                "final_answer_authorized":{"type":"boolean","enum":[False]}
+            }}
+
 def prompt(packet,registry,identity):
     limited={"video_id":identity["video_id"],
              "source_url":packet["source_url"],
@@ -140,6 +155,8 @@ def prepare(args):
                 refuse("untracked or missing transcript segment")
             promptdir=staging/"segment-prompts"
             promptdir.mkdir(mode=0o700)
+            schemadir=staging/"segment-schemas"
+            schemadir.mkdir(mode=0o700)
             h=_sha256()
             expected_offset=0
             for i,entry in enumerate(segindex["segments"]):
@@ -158,7 +175,7 @@ def prepare(args):
                     refuse("missing source bytes between segments")
                 chunk=raw.decode("utf-8")
                 chunk_input=json.loads(prompt_raw)
-                chunk_input["rules"].append("This is one of many ordered, non-overlapping transcript segments. Return observations bound to this segment only; no final whole-video verdict until all segments are independently processed and reconciled.")
+                chunk_input["rules"].append("This is one ordered transcript segment. Emit ONLY ghostmesh.reasonpack.segment-candidate.v1 under this segment's separate output schema, not the whole-video analysis schema. Record observations from this segment, not a final verdict.")
                 chunk_input["bounded_evidence"]["untrusted_video_transcript"]=chunk
                 chunk_input["bounded_evidence"]["segment_identity"]={"index":i,"sha256":entry["sha256"],
                              "source_start_byte":entry["start_byte"],"source_end_byte":entry["end_byte"],
@@ -168,8 +185,14 @@ def prepare(args):
                     refuse("single segment prompt exceeds per-invocation budget")
                 name=f"segment-{i:06d}.json"
                 safe_write(promptdir/name,encoded)
+                schema_name=f"segment-{i:06d}.schema.json"
+                schema_bytes=(json.dumps(segment_candidate_schema(i,entry["sha256"],digest(encoded)),
+                                         indent=2)+"\n").encode()
+                safe_write(schemadir/schema_name,schema_bytes)
                 segment_prompt_digests.append({"index":i,"segment_sha256":entry["sha256"],
-                                                "prompt_sha256":digest(encoded),"path":name})
+                                                "prompt_sha256":digest(encoded),"path":name,
+                                                "schema_sha256":digest(schema_bytes),
+                                                "schema_path":schema_name})
             if h.hexdigest()!=packet["transcript_sha256"] or expected_offset!=segindex["transcript_bytes"]:
                 refuse("segment coverage does not reconstruct source transcript")
         receipt={"schema":SCHEMA,"status":"model-input-ready-not-invoked","source_video_id":identity["video_id"],
