@@ -93,7 +93,7 @@ def timed_vtt(raw):
         hold("caption file missing or oversized")
     text=raw.decode("utf-8-sig",errors="replace")
     if not text.lstrip().startswith("WEBVTT"):hold("caption payload not WebVTT")
-    last=None; lines=[]; latest=-1.0; cues=0
+    last=None; lines=[]; latest=-1.0; previous_start=-1.0; cues=0
     rows=text.splitlines()
     active=False
     for index,line in enumerate(rows):
@@ -101,9 +101,12 @@ def timed_vtt(raw):
         if m:
             start=vtt_seconds(m.group("start"))
             endpoint=vtt_seconds(m.group("end"))
-            if start<0 or endpoint<start or (latest>=0 and endpoint<latest):
-                hold("out-of-order or invalid caption cue end")
-            latest=endpoint
+            if start<0 or endpoint<start or (previous_start>=0 and start<previous_start):
+                hold("out-of-order or invalid caption cue timing")
+            previous_start=start
+            # WebVTT cues can legally overlap. A later cue may end before
+            # an earlier one; source coverage is the MAXIMUM observed end.
+            latest=max(latest,endpoint)
             cues+=1
             active=True
             continue

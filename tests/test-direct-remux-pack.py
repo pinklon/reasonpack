@@ -158,6 +158,19 @@ class DirectPackTests(unittest.TestCase):
                if c[0]=="yt-dlp" and "--sub-langs" in c]
         self.assertEqual(langs,["en-orig","en"])
 
+    def test_overlapping_webvtt_cues_are_valid_and_counted(self):
+        clip=(b"WEBVTT\n\n00:00:00.000 --> 00:00:10.000\n"
+              b"Long first cue.\n\n00:00:02.000 --> 00:00:05.000\n"
+              b"Short overlapping cue.\n")
+        transcript,state=M.timed_vtt(clip)
+        self.assertEqual(state["last_caption_second"],10.0)
+        self.assertEqual(state["source_cue_count"],2)
+        self.assertIn(b"Short overlapping cue.",transcript)
+        invalid=(b"WEBVTT\n\n00:00:02.000 --> 00:00:05.000\nOne.\n\n"
+                 b"00:00:01.000 --> 00:00:03.000\nTwo.\n")
+        with self.assertRaisesRegex(ValueError,"out-of-order"):
+            M.timed_vtt(invalid)
+
     def test_timestamp_without_hours_is_supported(self):
         cue=(b"WEBVTT\n\n001\n00:00.000 --> 00:03.000\n"
              b"First line.\n\n002\n01:20.000 --> 02:00.000\n"
