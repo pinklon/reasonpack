@@ -128,6 +128,22 @@ class RealAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"source manifest/video identity"):
             self.acquire()
         self.assertFalse((self.job/"real-acquisition-result.json").exists())
+    def test_verifier_uses_same_isolated_home_as_download_not_parent_env(self):
+        from unittest import mock
+        self.acquire()
+        seen={}
+        def observing(argv,**kwargs):
+            seen.update(kwargs)
+            return fake_verify(argv,**kwargs)
+        with mock.patch.dict(os.environ,{"REASONPACK_MAIL_INGEST_KEY":"secret",
+                                          "HOME":"/outside-home"}):
+            result=A.verify_source(self.job,self.receipt,
+                                   verifier=self.binary,run=observing)
+        self.assertEqual(result["source_id"],VID)
+        self.assertEqual(seen["env"]["HOME"],str(self.job/"isolated-home"))
+        self.assertEqual(seen["env"]["XDG_CONFIG_HOME"],str(self.job/"isolated-home/.config"))
+        self.assertNotIn("REASONPACK_MAIL_INGEST_KEY",seen["env"])
+
     def test_corrupted_source_pack_rejected_on_readback(self):
         self.acquire()
         pack=self.job/"raw-acquisition"

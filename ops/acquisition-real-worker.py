@@ -62,11 +62,23 @@ def preflight(cli=CLI,pin=PIN):
             "command_mode":"reasonpack build CANONICAL_URL DEDICATED_EMPTY_DIR",
             "network_acquisition_performed":False}
 
+def isolated_env(job):
+    home=job/"isolated-home"
+    if home.is_symlink():deny("HOME cannot be a symlink")
+    home.mkdir(mode=0o700,exist_ok=True)
+    xdg=home/".config"
+    if xdg.is_symlink():deny("config root cannot be a symlink")
+    xdg.mkdir(mode=0o700,exist_ok=True)
+    return {"PATH":"/home/ghostmesh/.local/bin:/usr/bin:/bin",
+            "HOME":str(home),"XDG_CONFIG_HOME":str(xdg),
+            "LANG":"C.UTF-8","LC_ALL":"C.UTF-8"}
+
 def verify_source(job,receipt,verifier=CLI,run=subprocess.run):
     output=job/"raw-acquisition"
     if not output.is_dir() or output.is_symlink():deny("source pack missing")
     verified=run([str(verifier),"verify",str(output)],
-                 capture_output=True,text=True,timeout=90)
+                 capture_output=True,text=True,timeout=90,
+                 env=isolated_env(job))
     if verified.returncode:deny("ReasonPack pack verifier rejected acquired evidence")
     manifest=json.loads((output/"manifest.json").read_text("utf-8"))
     source=json.loads((output/"source.json").read_text("utf-8"))
@@ -116,11 +128,7 @@ def execute(job,receipt,*,cli=CLI,pin=PIN,runner=subprocess.Popen,verify_runner=
     output=job/"raw-acquisition"
     if output.exists() or output.is_symlink():deny("source output already exists: inspect before retry")
     output.mkdir(mode=0o700)
-    home=job/"isolated-home";home.mkdir(mode=0o700)
-    xdg=home/".config";xdg.mkdir(mode=0o700)
-    env={"PATH":"/home/ghostmesh/.local/bin:/usr/bin:/bin",
-         "HOME":str(home),"XDG_CONFIG_HOME":str(xdg),
-         "LANG":"C.UTF-8","LC_ALL":"C.UTF-8"}
+    env=isolated_env(job)
     stdout=job/"real-acquisition.stdout"
     stderr=job/"real-acquisition.stderr"
     child=None
