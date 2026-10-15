@@ -78,6 +78,18 @@ class ImportTests(unittest.TestCase):
         (self.src/"manifest.json").write_text(json.dumps(m))
         with self.assertRaises(ValueError):
             importer.verify_original(self.src)
+    def test_mutation_during_source_copy_is_rejected(self):
+        actual_copy=importer.shutil.copyfile
+        def mutating_copy(source,target):
+            source=Path(source)
+            if source.name=="manifest.json":
+                source.write_text(source.read_text()+" ")
+            return actual_copy(source,target)
+        with mock.patch.object(importer.shutil,"copyfile",side_effect=mutating_copy):
+            with self.assertRaisesRegex(ValueError,"verified original source changed"):
+                importer.import_pack(self.src,self.out,ROOT/"bin/reasonpack")
+        self.assertFalse(self.out.exists())
+
     def test_extra_file_rejected(self):
         (self.src/"extra.bin").write_bytes(b"extra")
         with self.assertRaisesRegex(ValueError,"untracked"):

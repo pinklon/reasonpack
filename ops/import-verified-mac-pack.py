@@ -41,7 +41,8 @@ def verify_original(src:Path):
     if entries != ORIGINAL or any((src/name).is_symlink() or not (src/name).is_file() for name in ORIGINAL):
         reject("Mac source directory has missing, untracked or linked members")
     original={}
-    for line in (src/"SHA256SUMS.txt").read_text().splitlines():
+    checksum_raw=(src/"SHA256SUMS.txt").read_bytes()
+    for line in checksum_raw.decode("utf-8").splitlines():
         parts=line.split("  ",1)
         if len(parts)!=2:
             reject("malformed original SHA inventory")
@@ -54,7 +55,10 @@ def verify_original(src:Path):
     for name,hash_value in original.items():
         if digest(src/name)!=hash_value:
             reject("original source byte integrity failure: "+name)
-    manifest=json.loads((src/"manifest.json").read_text())
+    manifest_raw=(src/"manifest.json").read_bytes()
+    if sha256(manifest_raw).hexdigest()!=original["manifest.json"]:
+        reject("original manifest changed after SHA verification")
+    manifest=json.loads(manifest_raw)
     if manifest.get("schema")!="reasonpack/1.0" or not isinstance(manifest.get("source"),dict):
         reject("invalid originating ReasonPack manifest")
     source=manifest["source"]
@@ -81,6 +85,7 @@ def verify_original(src:Path):
         catalog[name]=row
     if set(catalog)!={"video.mp4","audio.m4a","transcript.srt","transcript.txt"}:
         reject("incomplete original file catalog")
+    original["SHA256SUMS.txt"]=sha256(checksum_raw).hexdigest()
     return manifest,url,original
 
 def import_pack(src,out,refkit):
@@ -96,9 +101,18 @@ def import_pack(src,out,refkit):
             shutil.copyfile(src/name,stage/name)
         shutil.copyfile(src/"manifest.json",stage/"origin-manifest.json")
         shutil.copyfile(src/"SHA256SUMS.txt",stage/"origin-SHA256SUMS.txt")
+        original_targets={
+            "video.mp4":"video.mp4", "audio.m4a":"audio.m4a",
+            "transcript.srt":"transcript.srt", "transcript.txt":"transcript.txt",
+            "REASONING.md":"REASONING.md", "manifest.json":"origin-manifest.json",
+            "SHA256SUMS.txt":"origin-SHA256SUMS.txt",
+        }
+        for original_name,staged_name in original_targets.items():
+            if digest(stage/staged_name)!=original[original_name]:
+                reject("verified original source changed while staging: "+original_name)
         evidence={"status":"source-captions","sourceFile":"transcript.srt",
                   "caption_origin":"original Mac ReasonPack/1.0 source-caption export",
-                  "original_source_manifest_sha256":digest(src/"manifest.json"),
+                  "original_source_manifest_sha256":original["manifest.json"],
                   "original_caption_sha256":original["transcript.srt"],
                   "caption_accuracy_verified":False}
         (stage/"transcript-status.json").write_text(json.dumps(evidence,indent=2)+"\n")
@@ -106,7 +120,7 @@ def import_pack(src,out,refkit):
                 "channel":manifest["source"].get("channel"),
                 "webpage_url":url,
                 "importType":"verified-mac-reasonpack-1.0",
-                "original_manifest_sha256":digest(src/"manifest.json"),
+                "original_manifest_sha256":original["manifest.json"],
                 "fresh_youtube_download":False}
         (stage/"source.json").write_text(json.dumps(source,indent=2)+"\n")
         proc=subprocess.run(["ffprobe","-v","error","-show_format","-show_streams","-of","json",
@@ -118,8 +132,8 @@ def import_pack(src,out,refkit):
         produced={"schema":SCHEMA,"sourceUrl":url,"tools":{"importer":"verified-mac-pack-v1",
                     "ffprobe":"locally measured"},
                   "importedFrom":{"schema":"reasonpack/1.0",
-                    "sourceManifestSha256":digest(src/"manifest.json"),
-                    "originalShasumSha256":digest(src/"SHA256SUMS.txt"),
+                    "sourceManifestSha256":original["manifest.json"],
+                    "originalShasumSha256":original["SHA256SUMS.txt"],
                     "freshProviderRetrieval":False},
                   "members":[{"path":name,"sha256":digest(stage/name),
                               "bytes":(stage/name).stat().st_size} for name in files]}
@@ -130,14 +144,20 @@ def import_pack(src,out,refkit):
                                     capture_output=True,text=True,timeout=45)
         if verification.returncode:
             reject("canonical output rejected by verifier: "+verification.stderr[-250:])
-        for name in ("video.mp4","audio.m4a","transcript.srt","transcript.txt"):
-            if digest(stage/name)!=original[name]:
-                reject("transported source bytes changed during import")
+        original_targets={
+            "video.mp4":"video.mp4", "audio.m4a":"audio.m4a",
+            "transcript.srt":"transcript.srt", "transcript.txt":"transcript.txt",
+            "REASONING.md":"REASONING.md", "manifest.json":"origin-manifest.json",
+            "SHA256SUMS.txt":"origin-SHA256SUMS.txt",
+        }
+        for original_name,staged_name in original_targets.items():
+            if digest(stage/staged_name)!=original[original_name]:
+                reject("verified original source changed while staging: "+original_name)
         os.rename(stage,out)
         print(json.dumps({"status":"verified-import-not-fresh-download",
                           "source":url,"canonical_pack":str(out),
                           "canonical_manifest_sha256":digest(out/"manifest.json"),
-                          "original_manifest_sha256":digest(src/"manifest.json"),
+                          "original_manifest_sha256":original["manifest.json"],
                           "source_video_sha256":digest(out/"video.mp4"),
                           "source_transcript_sha256":digest(out/"transcript.txt")},sort_keys=True))
     finally:
