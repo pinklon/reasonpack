@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-VERSION="1.0-refkit.2"
+VERSION="1.0-refkit.3"
 DEFAULT_ROOT="${REASONPACK_ROOT:-$HOME/Desktop/Reasoning Packs}"
 log(){ printf '[reasonpack] %s\n' "$*"; }
 fail(){ printf '[reasonpack] ERROR: %s\n' "$*" >&2; exit "${2:-1}"; }
@@ -194,6 +194,19 @@ with open(os.path.join(root,'SHA256SUMS.txt'),'w') as out:
 PY
   verify "$td" >/dev/null; printf 'untracked\n' > "$td/extra.tmp"; if verify "$td" >/dev/null 2>&1; then return 91; fi; echo 'PASS reasonpack self-test'
 }
+build_fast(){
+  local source="$0" base helper
+  if [[ -L "$source" ]]; then
+    local link
+    link="$(readlink "$source")"
+    if [[ "$link" == /* ]]; then source="$link"; else source="$(dirname "$source")/$link"; fi
+  fi
+  base="$(cd "$(dirname "$source")" && pwd)"
+  helper="$base/direct-remux-pack.py"
+  [[ -f "$helper" ]] || helper="$base/../ops/direct-remux-pack.py"
+  [[ -f "$helper" && ! -L "$helper" ]] || fail "pinned fast capture helper not installed" 20
+  python3 "$helper" --source-url "$1" --output "$2"
+}
 quick(){
   local url="$1" root="${2:-$DEFAULT_ROOT}"; need yt-dlp; need python3; validate_url "$url" >/dev/null
   local meta title vid folder; meta="$(yt-dlp --dump-single-json --skip-download --no-playlist "$url")"; title="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("title") or "YouTube")' <<<"$meta")"; vid="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("id") or "unknown")' <<<"$meta")"; folder="$(slug_for "$title" "$vid")"; mkdir -p "$root"; build "$url" "$root/$folder"; printf '%s\n' "$root/$folder"
@@ -204,6 +217,7 @@ Usage:
   reasonpack doctor
   reasonpack inspect URL
   reasonpack build URL OUT_DIR
+  reasonpack build-fast URL OUT_DIR      # direct MP4/AAC remux, no video encode
   reasonpack verify OUT_DIR
   reasonpack self-test
   reasonpack URL [OUTPUT_ROOT]
@@ -214,4 +228,4 @@ EOF
 }
 cmd="${1:-}"; [[ -n "$cmd" ]] || { usage; exit 64; }; shift || true
 case "$cmd" in
- doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
+ doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; build-fast) [[ $# -eq 2 ]] || exit 64; build_fast "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
