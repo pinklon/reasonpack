@@ -18,6 +18,8 @@ VIDEO={"streams":[{"codec_type":"video","codec_name":"av1","duration":"30.5"},
 AUDIO={"streams":[{"codec_type":"audio","codec_name":"aac","duration":"30.5"}],
        "format":{"duration":"30.5"}}
 VTT=b"WEBVTT\nKind: captions\nLanguage: en\n\n00:00:00.000 --> 00:00:03.000\nHello from Argon.\n\n00:00:27.000 --> 00:00:30.000\nAnother idea.\n"
+VERSIONS={"yt-dlp":"2026.08.19","ffmpeg":"ffmpeg version 8.0",
+          "ffprobe":"ffprobe version 8.0","python3":"Python 3.14.4"}
 
 class DirectPackTests(unittest.TestCase):
     def setUp(self):
@@ -25,6 +27,9 @@ class DirectPackTests(unittest.TestCase):
         self.addCleanup(t.cleanup)
         self.tmp=Path(t.name)
         self.calls=[]
+    def build_fast(self,target,*,run,probe_media):
+        return M.build(URL,target,run=run,probe_media=probe_media,
+                       version_reader=lambda:VERSIONS)
     def fake_run(self,argv,*,stdout=None):
         argv=list(map(str,argv))
         self.calls.append(argv)
@@ -59,7 +64,7 @@ class DirectPackTests(unittest.TestCase):
         return VIDEO if Path(path).name=="video.mp4" else AUDIO
     def test_full_canonical_pack_without_reencode(self):
         target=self.tmp/"verified"
-        res=M.build(URL,target,run=self.fake_run,probe_media=self.fake_probe)
+        res=self.build_fast(target,run=self.fake_run,probe_media=self.fake_probe)
         self.assertEqual(res["status"],"canonical-direct-remux-verified")
         self.assertFalse(res["video_reencoded"])
         self.assertEqual(res["video_codec"],"av1")
@@ -67,6 +72,7 @@ class DirectPackTests(unittest.TestCase):
         m=json.loads((target/"manifest.json").read_text())
         self.assertEqual(m["mediaPreparation"],"direct-mp4-aac-remux-no-video-encode")
         self.assertEqual(len(m["members"]),7)
+        self.assertEqual(m["tools"],VERSIONS)
         self.assertIn("Hello from Argon.",(target/"transcript.txt").read_text())
         self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
         self.assertEqual(sum(cmd[0]=="yt-dlp" for cmd in self.calls),3)
@@ -77,7 +83,7 @@ class DirectPackTests(unittest.TestCase):
         t=self.tmp/"already"
         t.mkdir()
         with self.assertRaisesRegex(ValueError,"exists"):
-            M.build(URL,t,run=self.fake_run,probe_media=self.fake_probe)
+            self.build_fast(t,run=self.fake_run,probe_media=self.fake_probe)
         self.assertEqual(self.calls,[])
     def test_source_url_rejects_untrusted_hosts_and_parameters(self):
         for v in ("http://www.youtube.com/watch?v=jEOUUAPC1sc",
@@ -129,7 +135,7 @@ class DirectPackTests(unittest.TestCase):
                 for name in ("captions.en-orig.vtt","captions.en.vtt"):
                     template.with_name(name).unlink()
                 template.with_name("captions.en-US.vtt").write_bytes(VTT)
-        result=M.build(URL,self.tmp/"regional",run=regional_runner,
+        result=self.build_fast(self.tmp/"regional",run=regional_runner,
                        probe_media=self.fake_probe)
         self.assertEqual(result["status"],"canonical-direct-remux-verified")
         self.assertEqual((self.tmp/"regional/captions.vtt").read_bytes(),VTT)
@@ -149,7 +155,7 @@ class DirectPackTests(unittest.TestCase):
             if "--sub-langs" in argv and argv[argv.index("--sub-langs")+1]=="en-GB":
                 self.fail("Unused regional fallback must not be downloaded")
             self.fake_run(argv,stdout=stdout)
-        got=M.build(URL,self.tmp/"preferred",run=runner,probe_media=self.fake_probe)
+        got=self.build_fast(self.tmp/"preferred",run=runner,probe_media=self.fake_probe)
         self.assertEqual(got["status"],"canonical-direct-remux-verified")
         langs=[c[c.index("--sub-langs")+1] for c in self.calls
                if c[0]=="yt-dlp" and "--sub-langs" in c]
@@ -162,7 +168,7 @@ class DirectPackTests(unittest.TestCase):
                 self.calls.append(argv)
                 raise subprocess.CalledProcessError(1,argv)
             self.fake_run(argv,stdout=stdout)
-        got=M.build(URL,self.tmp/"fallback",run=runner,probe_media=self.fake_probe)
+        got=self.build_fast(self.tmp/"fallback",run=runner,probe_media=self.fake_probe)
         self.assertEqual(got["status"],"canonical-direct-remux-verified")
         langs=[c[c.index("--sub-langs")+1] for c in self.calls
                if c[0]=="yt-dlp" and "--sub-langs" in c]
@@ -192,7 +198,7 @@ class DirectPackTests(unittest.TestCase):
                 template=Path(argv[argv.index("-o")+1])
                 template.with_name("captions.en-orig.vtt").write_bytes(
                     b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\ntruncated\n")
-        got=M.build(URL,self.tmp/"verified-fallback",run=runner,
+        got=self.build_fast(self.tmp/"verified-fallback",run=runner,
                     probe_media=self.fake_probe)
         self.assertEqual(got["status"],"canonical-direct-remux-verified")
         self.assertEqual((self.tmp/"verified-fallback/captions.vtt").read_bytes(),VTT)
@@ -266,6 +272,62 @@ class DirectPackTests(unittest.TestCase):
         self.assertNotIn(b"clip-002",transcript)
         self.assertEqual(transcript,b"Spoken content.\nFinal sentence.\n")
         self.assertGreaterEqual(meta["last_caption_second"],120-max(25,120*0.02))
+
+    def test_short_video_caption_tolerance_is_duration_relative(self):
+        cases=((20.0,1.0,False),(30.0,5.0,False),
+               (20.0,19.5,True),(30.0,29.0,True),
+               (30.5,30.0,True),(1850.0,1826.0,True),
+               (1850.0,1824.0,False),(2.0,0.1,False),
+               (2.0,1.95,True),(20.0,25.0,False))
+        for duration,last,expected in cases:
+            with self.subTest(duration=duration,last=last):
+                self.assertEqual(M.captions_reach_end(last,duration),expected)
+        for invalid in (float("nan"),float("inf"),-1.0,0.0):
+            self.assertFalse(M.captions_reach_end(invalid,30.0))
+            self.assertFalse(M.captions_reach_end(1.0,invalid))
+
+    def test_truncated_short_video_captions_cannot_publish_pack(self):
+        from copy import deepcopy
+        short_video=deepcopy(VIDEO)
+        short_audio=deepcopy(AUDIO)
+        for track in short_video["streams"]:
+            track["duration"]="20.0"
+        short_video["format"]["duration"]="20.0"
+        short_audio["streams"][0]["duration"]="20.0"
+        short_audio["format"]["duration"]="20.0"
+        truncated=(b"WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n"
+                   b"Incomplete caption.\n")
+        self.assertEqual(M.timed_vtt(truncated)[1]["last_caption_second"],1.0)
+        def runner(argv,*,stdout=None):
+            self.fake_run(argv,stdout=stdout)
+            if "--write-subs" in argv:
+                template=Path(argv[argv.index("-o")+1])
+                for suffix in ("en-orig","en"):
+                    template.with_name("captions."+suffix+".vtt").write_bytes(truncated)
+        def probe_short(path):
+            return short_video if Path(path).name=="video.mp4" else short_audio
+        target=self.tmp/"short-incomplete"
+        with self.assertRaisesRegex(ValueError,"no usable full-length English captions"):
+            self.build_fast(target,run=runner,probe_media=probe_short)
+        self.assertFalse(target.exists())
+        self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+
+    def test_tool_provenance_capture_and_fail_closed(self):
+        seen=[]
+        def tool_runner(argv,**kwargs):
+            seen.append(argv)
+            self.assertEqual(kwargs["timeout"],10)
+            self.assertEqual(kwargs["stdin"],subprocess.DEVNULL)
+            return subprocess.CompletedProcess(argv,0,VERSIONS[argv[0]].encode()+b"\n")
+        self.assertEqual(M.capture_tool_versions(runner=tool_runner),VERSIONS)
+        self.assertEqual(seen,[["yt-dlp","--version"],["ffmpeg","-version"],
+                               ["ffprobe","-version"],["python3","--version"]])
+        for code,payload in ((1,b"error"),(0,b""),(0,b"X"*65537)):
+            def rejected_runner(argv,**kwargs):
+                return subprocess.CompletedProcess(argv,code,payload)
+            with self.subTest(code=code,output_bytes=len(payload)):
+                with self.assertRaisesRegex(ValueError,"tool version unavailable"):
+                    M.capture_tool_versions(runner=rejected_runner)
 
     def test_fast_builder_does_not_change_legacy_build(self):
         source=(ROOT/"bin/reasonpack").read_text()

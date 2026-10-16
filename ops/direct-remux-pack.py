@@ -11,6 +11,7 @@ import argparse
 from hashlib import sha256
 from html import unescape
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -58,6 +59,24 @@ def file_sha(path):
 
 def invoke(args,*,stdout=None):
     return subprocess.run(args,check=True,stdin=subprocess.DEVNULL,stdout=stdout)
+
+def capture_tool_versions(*,runner=subprocess.run):
+    versions={}
+    for name in ("yt-dlp","ffmpeg","ffprobe","python3"):
+        flag="-version" if name in ("ffmpeg","ffprobe") else "--version"
+        result=runner([name,flag],stdin=subprocess.DEVNULL,
+                      stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                      timeout=10,check=False)
+        output=result.stdout
+        if (result.returncode!=0 or not isinstance(output,bytes)
+            or not (0<len(output)<=65536)):
+            hold("tool version unavailable: "+name)
+        lines=output.decode("utf-8",errors="replace").splitlines()
+        first=lines[0].strip() if lines else ""
+        if not first or len(first)>1024:
+            hold("invalid tool version: "+name)
+        versions[name]=first
+    return versions
 
 def probe(path):
     p=subprocess.run(["ffprobe","-v","error","-show_streams",
@@ -175,10 +194,20 @@ def timed_vtt(raw):
         "source_line_count":len(lines),
         "last_caption_second":round(latest,3)}
 
+def captions_reach_end(last_caption_second,duration_seconds):
+    if (not math.isfinite(last_caption_second) or
+        not math.isfinite(duration_seconds) or duration_seconds<=0 or
+        last_caption_second<=0):
+        return False
+    # A fixed 25-second grace period would swallow an entire short video.
+    # End coverage does not prove continuous or semantic transcript coverage.
+    tolerance=min(25.0,max(2.0,duration_seconds*0.02),duration_seconds*0.10)
+    return abs(duration_seconds-last_caption_second)<=tolerance
+
 def write_json(path,obj):
     path.write_text(json.dumps(obj,sort_keys=True,indent=2,ensure_ascii=True)+"\n")
 
-def manifest_and_inventory(folder,url,receipt):
+def manifest_and_inventory(folder,url,receipt,tools):
     members=[]
     for name in MEMBERS:
         p=folder/name
@@ -191,14 +220,14 @@ def manifest_and_inventory(folder,url,receipt):
                     "video_codec":receipt["video_codec"],
                     "audio_codec":receipt["audio_codec"],
                     "last_caption_second":receipt["last_caption_second"]},
-         "tools":{},"members":members}
+         "tools":tools,"members":members}
     write_json(folder/"manifest.json",doc)
     with (folder/"SHA256SUMS.txt").open("w") as out:
         for name in (*MEMBERS,"manifest.json"):
             out.write(file_sha(folder/name)+"  "+name+"\n")
     return doc
 
-def build(url,target,*,run=invoke,probe_media=probe):
+def build(url,target,*,run=invoke,probe_media=probe,version_reader=None):
     vid=canonical_youtube(url)
     if target.exists() or target.is_symlink():hold("output already exists")
     if target.parent.is_symlink():hold("symlinked output parent")
@@ -250,7 +279,8 @@ def build(url,target,*,run=invoke,probe_media=probe):
             if candidate.is_file() and not candidate.is_symlink():
                 try:
                     text,coverage=timed_vtt(candidate.read_bytes())
-                    if coverage["last_caption_second"]<media["duration_seconds"]-max(25,media["duration_seconds"]*0.02):
+                    if not captions_reach_end(coverage["last_caption_second"],
+                                              media["duration_seconds"]):
                         continue
                 except (ValueError,OSError,UnicodeError):
                     continue
@@ -266,7 +296,8 @@ def build(url,target,*,run=invoke,probe_media=probe):
             {"status":"source-captions","sourceFile":"captions.vtt",
              "caption_line_count":captions["source_line_count"],
              "last_caption_second":captions["last_caption_second"]})
-        doc=manifest_and_inventory(stage,url,{**media,**captions})
+        versions=(version_reader or capture_tool_versions)()
+        doc=manifest_and_inventory(stage,url,{**media,**captions},versions)
         repo_cli=ROOT/"bin/reasonpack"
         installed_cli=Path(__file__).resolve().parent/"reasonpack"
         verifier=repo_cli if repo_cli.is_file() else installed_cli
