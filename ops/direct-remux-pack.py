@@ -111,9 +111,11 @@ def validate_direct_media(video,audio,video_probe,audio_probe):
     except (ValueError,KeyError,TypeError,StopIteration):
         hold("exact per-stream video/audio durations unavailable")
     durations=(vd,ad,actual_video,actual_audio,extracted_audio)
-    if any(x<=0 for x in durations):
+    if any(not math.isfinite(x) or x<=0 for x in durations):
         hold("invalid video/audio stream duration")
-    tolerance=max(5,vd*0.01)
+    # Short sources cannot lose seconds of visual evidence merely because the
+    # MP4 container and AAC audio report the expected total duration.
+    tolerance=min(5.0,max(0.25,vd*0.01),vd*0.05)
     if any(abs(x-actual_video)>tolerance for x in durations):
         hold("video/audio stream durations disagree")
     if any(not p.is_file() or p.is_symlink() or p.stat().st_size==0 for p in (video,audio)):

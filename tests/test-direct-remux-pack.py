@@ -115,6 +115,55 @@ class DirectPackTests(unittest.TestCase):
             M.validate_direct_media(self.tmp/"video.mp4",self.tmp/"audio.m4a",
                                     video,audio)
 
+    def test_short_media_stream_cannot_pass_with_complete_container_and_audio(self):
+        from copy import deepcopy
+        video_path=self.tmp/"video.mp4"
+        audio_path=self.tmp/"audio.m4a"
+        video_path.write_bytes(b"video-fixture")
+        audio_path.write_bytes(b"audio-fixture")
+        cases=((20.0,15.1,False),(20.0,19.9,True),
+               (30.5,25.6,False),(30.5,30.4,True),
+               (1850.0,1844.0,False),(1850.0,1846.0,True))
+        for duration,actual_stream,accepted in cases:
+            with self.subTest(container=duration,video_stream=actual_stream):
+                video=deepcopy(VIDEO)
+                audio=deepcopy(AUDIO)
+                video["format"]["duration"]=str(duration)
+                for stream in video["streams"]:
+                    stream["duration"]=str(duration)
+                video["streams"][0]["duration"]=str(actual_stream)
+                audio["format"]["duration"]=str(duration)
+                audio["streams"][0]["duration"]=str(duration)
+                if accepted:
+                    got=M.validate_direct_media(video_path,audio_path,video,audio)
+                    self.assertEqual(got["duration_seconds"],duration)
+                else:
+                    with self.assertRaisesRegex(ValueError,"stream durations disagree"):
+                        M.validate_direct_media(video_path,audio_path,video,audio)
+        for nonfinite in ("nan","inf","-inf"):
+            video=deepcopy(VIDEO)
+            video["streams"][0]["duration"]=nonfinite
+            with self.subTest(nonfinite=nonfinite):
+                with self.assertRaisesRegex(ValueError,"invalid video/audio stream duration"):
+                    M.validate_direct_media(video_path,audio_path,video,AUDIO)
+
+    def test_complete_captions_cannot_mask_truncated_short_video(self):
+        from copy import deepcopy
+        video=deepcopy(VIDEO)
+        audio=deepcopy(AUDIO)
+        video["format"]["duration"]="20.0"
+        video["streams"][0]["duration"]="15.1"
+        video["streams"][1]["duration"]="20.0"
+        audio["format"]["duration"]="20.0"
+        audio["streams"][0]["duration"]="20.0"
+        target=self.tmp/"truncated-media"
+        def short_probe(path):
+            return video if Path(path).name=="video.mp4" else audio
+        with self.assertRaisesRegex(ValueError,"stream durations disagree"):
+            self.build_fast(target,run=self.fake_run,probe_media=short_probe)
+        self.assertFalse(target.exists())
+        self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+
     def test_caption_coverage_and_normalization(self):
         txt,meta=M.timed_vtt(VTT)
         self.assertEqual(meta["source_cue_count"],2)
