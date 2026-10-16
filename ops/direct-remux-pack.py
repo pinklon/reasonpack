@@ -246,6 +246,14 @@ def build(url,target,*,run=invoke,probe_media=probe,version_reader=None):
         if (meta.get("id")!=vid or meta.get("is_live")
             or meta.get("live_status") in ("is_live","is_upcoming")):
             hold("source ID drift or live video unsupported")
+        if isinstance(meta.get("duration"),bool):
+            hold("source duration unavailable")
+        try:
+            source_duration=float(meta["duration"])
+        except (ValueError,KeyError,TypeError,OverflowError):
+            hold("source duration unavailable")
+        if not math.isfinite(source_duration) or source_duration<=0:
+            hold("invalid source duration")
         run(["yt-dlp","--ignore-config","--no-playlist",
              "-f","bv*[ext=mp4]+ba[ext=m4a]","--merge-output-format","mp4",
              "-o",str(stage/"video.%(ext)s"),url])
@@ -256,6 +264,12 @@ def build(url,target,*,run=invoke,probe_media=probe,version_reader=None):
              "-i",str(video),"-map","0:a:0","-vn","-c:a","copy",str(stage/"audio.m4a")])
         vp=probe_media(video); ap=probe_media(stage/"audio.m4a")
         media=validate_direct_media(video,stage/"audio.m4a",vp,ap)
+        # Independent source-duration custody rejects outputs shortened
+        # consistently across container, streams, audio and captions.
+        source_tolerance=min(5.0,max(1.0,source_duration*0.01),
+                             source_duration*0.05)
+        if abs(media["duration_seconds"]-source_duration)>source_tolerance:
+            hold("captured media duration differs from source metadata")
         write_json(stage/"ffprobe.json",vp)
         catalog=set((meta.get("subtitles") or {}).keys())
         catalog.update((meta.get("automatic_captions") or {}).keys())

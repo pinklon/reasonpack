@@ -37,7 +37,7 @@ class DirectPackTests(unittest.TestCase):
             self.assertIn("--ignore-config",argv)
             self.assertIn("--no-playlist",argv)
             if "--dump-single-json" in argv:
-                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,"duration":30.5,
                   "subtitles":{"en-orig":[{"ext":"vtt"}],"en":[{"ext":"vtt"}]}}).encode())
             elif "--write-subs" in argv:
                 template=Path(argv[argv.index("-o")+1])
@@ -115,6 +115,48 @@ class DirectPackTests(unittest.TestCase):
             M.validate_direct_media(self.tmp/"video.mp4",self.tmp/"audio.m4a",
                                     video,audio)
 
+    def test_consistently_shortened_media_rejected_against_source_duration(self):
+        from copy import deepcopy
+        vp=deepcopy(VIDEO)
+        ap=deepcopy(AUDIO)
+        for stream in vp["streams"]:
+            stream["duration"]="15.1"
+        vp["format"]["duration"]="15.1"
+        ap["streams"][0]["duration"]="15.1"
+        ap["format"]["duration"]="15.1"
+        def runner(argv,*,stdout=None):
+            if "--dump-single-json" in argv:
+                self.calls.append(list(argv))
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","duration":20.0,
+                    "subtitles":{"en-orig":[{"ext":"vtt"}]}}).encode())
+                return
+            self.fake_run(argv,stdout=stdout)
+        def shortened_probe(path):
+            return vp if Path(path).name=="video.mp4" else ap
+        target=self.tmp/"consistent-short"
+        with self.assertRaisesRegex(ValueError,"captured media duration differs from source metadata"):
+            self.build_fast(target,run=runner,probe_media=shortened_probe)
+        self.assertFalse(target.exists())
+        self.assertFalse(any("--write-subs" in args for args in self.calls))
+        self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+
+    def test_invalid_source_metadata_duration_fails_closed(self):
+        for duration in (None,True,0,-10,"nan","inf","invalid"):
+            with self.subTest(duration=duration):
+                self.calls=[]
+                def runner(argv,*,stdout=None):
+                    if "--dump-single-json" in argv:
+                        self.calls.append(list(argv))
+                        stdout.write(json.dumps({"id":"jEOUUAPC1sc",
+                                                 "duration":duration}).encode())
+                    else:
+                        self.fail("No media download when source duration invalid")
+                target=self.tmp/("invalid-source-"+str(duration))
+                with self.assertRaisesRegex(ValueError,"source duration"):
+                    self.build_fast(target,run=runner,probe_media=self.fake_probe)
+                self.assertFalse(target.exists())
+                self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+
     def test_short_media_stream_cannot_pass_with_complete_container_and_audio(self):
         from copy import deepcopy
         video_path=self.tmp/"video.mp4"
@@ -175,7 +217,7 @@ class DirectPackTests(unittest.TestCase):
         def regional_runner(argv,*,stdout=None):
             if "--dump-single-json" in argv:
                 self.calls.append(argv)
-                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","is_live":False,"duration":30.5,
                     "automatic_captions":{"en-US":[{"ext":"vtt"}]}}).encode())
                 return
             self.fake_run(argv,stdout=stdout)
@@ -197,7 +239,7 @@ class DirectPackTests(unittest.TestCase):
         def runner(argv,*,stdout=None):
             if "--dump-single-json" in argv:
                 self.calls.append(argv)
-                stdout.write(json.dumps({"id":"jEOUUAPC1sc",
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","duration":30.5,
                   "automatic_captions":{"en-orig":[{"ext":"vtt"}],
                                         "en-GB":[{"ext":"vtt"}]}}).encode())
                 return
@@ -348,6 +390,12 @@ class DirectPackTests(unittest.TestCase):
                    b"Incomplete caption.\n")
         self.assertEqual(M.timed_vtt(truncated)[1]["last_caption_second"],1.0)
         def runner(argv,*,stdout=None):
+            if "--dump-single-json" in argv:
+                self.calls.append(list(argv))
+                stdout.write(json.dumps({"id":"jEOUUAPC1sc","duration":20.0,
+                    "subtitles":{"en-orig":[{"ext":"vtt"}],
+                                 "en":[{"ext":"vtt"}]}}).encode())
+                return
             self.fake_run(argv,stdout=stdout)
             if "--write-subs" in argv:
                 template=Path(argv[argv.index("-o")+1])
