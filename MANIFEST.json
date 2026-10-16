@@ -269,8 +269,8 @@
     },
     {
       "path": "ops/direct-remux-pack.py",
-      "bytes": 16443,
-      "sha256": "3deb965a7a03d2e623d67553b5c066ec99ede5e479a3c274e3183b1a68ef2c77"
+      "bytes": 16786,
+      "sha256": "f6913c5a3923b593b43426900d2a68bc62dfcd1aba30f8aafec80f11c0a5c400"
     },
     {
       "path": "presentation/reasonpack-vision-poster.png",

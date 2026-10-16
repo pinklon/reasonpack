@@ -409,6 +409,43 @@ class DirectPackTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
 
+    def test_oversized_caption_falls_back_without_unbounded_read(self):
+        from unittest.mock import patch
+        def runner(argv,*,stdout=None):
+            self.fake_run(argv,stdout=stdout)
+            if ("--sub-langs" in argv and
+                argv[argv.index("--sub-langs")+1]=="en-orig"):
+                template=Path(argv[argv.index("-o")+1])
+                template.with_name("captions.en-orig.vtt").write_bytes(
+                    VTT+b" "*1024)
+        with patch.object(M,"MAX_VTT_BYTES",512):
+            target=self.tmp/"oversized-preferred"
+            got=self.build_fast(target,run=runner,probe_media=self.fake_probe)
+        self.assertEqual(got["status"],"canonical-direct-remux-verified")
+        self.assertEqual((target/"captions.vtt").read_bytes(),VTT)
+        self.assertEqual(
+            [c[c.index("--sub-langs")+1] for c in self.calls
+             if "--sub-langs" in c],["en-orig","en"])
+        source=(ROOT/"ops/direct-remux-pack.py").read_text()
+        self.assertIn("caption_file.read(MAX_VTT_BYTES+1)",source)
+        self.assertNotIn("timed_vtt(candidate.read_bytes())",source)
+
+    def test_all_oversized_captions_fail_without_publication(self):
+        from unittest.mock import patch
+        def runner(argv,*,stdout=None):
+            self.fake_run(argv,stdout=stdout)
+            if "--write-subs" in argv:
+                template=Path(argv[argv.index("-o")+1])
+                language=argv[argv.index("--sub-langs")+1]
+                template.with_name("captions."+language+".vtt").write_bytes(
+                    VTT+b" "*1024)
+        target=self.tmp/"oversized-all"
+        with patch.object(M,"MAX_VTT_BYTES",512):
+            with self.assertRaisesRegex(ValueError,"no usable full-length English captions"):
+                self.build_fast(target,run=runner,probe_media=self.fake_probe)
+        self.assertFalse(target.exists())
+        self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+
     def test_tool_provenance_capture_and_fail_closed(self):
         seen=[]
         def tool_runner(argv,**kwargs):

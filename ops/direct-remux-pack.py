@@ -294,7 +294,13 @@ def build(url,target,*,run=invoke,probe_media=probe,version_reader=None):
             candidate=stage/("captions."+language+".vtt")
             if candidate.is_file() and not candidate.is_symlink():
                 try:
-                    text,coverage=timed_vtt(candidate.read_bytes())
+                    # Bound the read itself, not just validation afterward.
+                    # A changing or oversized VTT must never be read unbounded.
+                    with candidate.open("rb") as caption_file:
+                        raw=caption_file.read(MAX_VTT_BYTES+1)
+                    if len(raw)>MAX_VTT_BYTES:
+                        continue
+                    text,coverage=timed_vtt(raw)
                     if not captions_reach_end(coverage["last_caption_second"],
                                               media["duration_seconds"]):
                         continue
