@@ -76,6 +76,19 @@ class PipelineTests(unittest.TestCase):
         raw=json.dumps(e,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
         e["auth_tag"]=hmac.new(self.key,raw,"sha256").hexdigest()
         self.email.write_text(json.dumps(e))
+    def test_gateway_key_is_not_forwarded_to_child_processes(self):
+        spec=importlib.util.spec_from_file_location("reader_pipeline_test",ROOT/"ops/reader-pipeline.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        previous=os.environ.get("REASONPACK_MAIL_INGEST_KEY")
+        os.environ["REASONPACK_MAIL_INGEST_KEY"]=self.key.decode()
+        try:
+            child=module.execute([sys.executable,"-c",
+                                  "import os; print(os.getenv('REASONPACK_MAIL_INGEST_KEY', 'absent'))"])
+            self.assertEqual(child.strip(),"absent")
+        finally:
+            if previous is None: os.environ.pop("REASONPACK_MAIL_INGEST_KEY",None)
+            else: os.environ["REASONPACK_MAIL_INGEST_KEY"]=previous
     def cli(self,program,*args,extra_env=None):
         env=os.environ.copy()
         env["REASONPACK_MAIL_INGEST_KEY"]=self.key.decode()
@@ -104,9 +117,40 @@ class PipelineTests(unittest.TestCase):
         return path
     def init(self):
         item=self.admission()
-        r=self.cli("reader-pipeline.py","init","--admission",item,"--root",self.pipeline)
+        r=self.cli("reader-pipeline.py","init","--admission",item,"--root",self.pipeline,
+                   "--envelope",self.email,"--allow-sender",self.sender)
         self.assertEqual(r.returncode,0,r.stderr)
         return self.pipeline/json.loads(r.stdout)["job"]
+    def test_handwritten_admission_cannot_initialize_workflow(self):
+        receipt=self.admission()
+        forged=json.loads(receipt.read_text())
+        forged["sender"]="other@example.org"
+        forged["subject"]="Forged recipient"
+        forged_path=self.root/"forged-admission.json"
+        forged_path.write_text(json.dumps(forged))
+        result=self.cli("reader-pipeline.py","init","--admission",forged_path,
+                        "--root",self.pipeline,"--envelope",self.email,
+                        "--allow-sender",self.sender)
+        self.assertEqual(result.returncode,2)
+        self.assertFalse((self.pipeline/forged["job_id"]).exists())
+
+    def test_init_requires_signed_gateway_evidence(self):
+        receipt=self.admission()
+        result=self.cli("reader-pipeline.py","init","--admission",receipt,"--root",self.pipeline)
+        self.assertEqual(result.returncode,2)
+        self.assertFalse(self.pipeline.exists())
+
+    def test_modified_subject_cannot_initialize_workflow(self):
+        receipt=self.admission()
+        forged=json.loads(receipt.read_text())
+        forged["subject"]="Different thread title"
+        forged_path=self.root/"subject-drift.json"
+        forged_path.write_text(json.dumps(forged))
+        result=self.cli("reader-pipeline.py","init","--admission",forged_path,
+                        "--root",self.pipeline,"--envelope",self.email,
+                        "--allow-sender",self.sender)
+        self.assertEqual(result.returncode,2)
+        self.assertFalse((self.pipeline/forged["job_id"]).exists())
     def progress(self,job,step,*args):
         r=self.cli("reader-pipeline.py",step,"--job",job,*args)
         self.assertEqual(r.returncode,0,step+": "+r.stderr)
@@ -201,10 +245,12 @@ class PipelineTests(unittest.TestCase):
     def test_duplicate_idempotency_and_mutated_request_rejected(self):
         job=self.init()
         rec=next(self.jobs.rglob("*.json"))
-        self.assertEqual(json.loads(self.cli("reader-pipeline.py","init","--admission",rec,"--root",self.pipeline).stdout)["status"],"duplicate")
+        self.assertEqual(json.loads(self.cli("reader-pipeline.py","init","--admission",rec,"--root",self.pipeline,
+                                       "--envelope",self.email,"--allow-sender",self.sender).stdout)["status"],"duplicate")
         change=json.loads(rec.read_text());change["subject"]="tampered"
         rec.write_text(json.dumps(change))
-        self.assertEqual(self.cli("reader-pipeline.py","init","--admission",rec,"--root",self.pipeline).returncode,2)
+        self.assertEqual(self.cli("reader-pipeline.py","init","--admission",rec,"--root",self.pipeline,
+                                  "--envelope",self.email,"--allow-sender",self.sender).returncode,2)
 
     def test_tamper_verified_source_fails_next_stage(self):
         job=self.init()

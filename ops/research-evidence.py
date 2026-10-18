@@ -102,6 +102,13 @@ def verified_register(path:Path, packet_path:Path):
 def assert_supported_claims(analysis:dict,registry:dict):
     """Evidence binding is syntactic; human/source review is still required."""
     urls={s["url"]:s for s in registry["sources"]}
+    def bound_citation(cited):
+        if not isinstance(cited,dict) or cited.get("url") not in urls:
+            reject("generated claim cites an unregistered evidence URL")
+        source=urls[cited["url"]]
+        if cited.get("label")!=source["title"]:
+            reject("citation label differs from registered source title")
+        return source
     linked=0
     for c in analysis.get("claims",[]):
         verdict=c.get("verdict")
@@ -112,16 +119,13 @@ def assert_supported_claims(analysis:dict,registry:dict):
             # A supported verdict requires an independently collected source;
             # a title and invented URL from the generating model do not count.
             for cited in citations:
-                if not isinstance(cited,dict) or cited.get("url") not in urls:
-                    reject("generated claim cites an unregistered evidence URL")
-                source=urls[cited["url"]]
+                source=bound_citation(cited)
                 if source["evidence_type"]=="context" and verdict=="supported":
                     reject("context-only evidence cannot establish a supported claim")
                 linked+=1
         else:
             for cited in c.get("sources",[]):
-                if cited.get("url") not in urls:
-                    reject("unregistered optional evidence reference")
+                bound_citation(cited)
     return {"registered_sources":len(urls),"bound_citations":linked,
             "semantic_source_review":"not-attested",
             "automated_publication_authority":False}

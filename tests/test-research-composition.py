@@ -47,7 +47,7 @@ class CompositionTests(unittest.TestCase):
         self.analysis=self.root/"analysis.json"
         self.content=json.loads((ROOT/"examples/reader-synthetic-analysis.json").read_text())
         self.content["claims"][0]["verdict"]="supported"
-        self.content["claims"][0]["sources"]=[{"label":"Synthetic primary reference","url":self.source}]
+        self.content["claims"][0]["sources"]=[{"label":"Test reference","url":self.source}]
         self.analysis.write_text(json.dumps(self.content))
         self.bundle=self.root/"composition"
     def prepare(self):
@@ -85,6 +85,14 @@ class CompositionTests(unittest.TestCase):
         self.content["claims"][0]["sources"]=[{"label":"Fake","url":"https://example.com/ghost"}]
         self.analysis.write_text(json.dumps(self.content))
         self.assertEqual(self.validate().returncode,2)
+
+    def test_registered_url_with_fabricated_display_label_rejected(self):
+        self.content["claims"][0]["sources"]=[
+            {"label":"Government agency confirms this claim","url":self.source}]
+        self.analysis.write_text(json.dumps(self.content))
+        result=self.validate()
+        self.assertEqual(result.returncode,2)
+        self.assertIn("citation label",result.stderr)
 
     def test_nonpublic_local_link_rejected(self):
         self.content["claims"][0]["sources"]=[{"label":"Intranet","url":"https://localhost/private"}]
