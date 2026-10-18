@@ -34,6 +34,8 @@ class ContainmentTests(unittest.TestCase):
             "/system.slice/"+expected+"/child",
             "/system.slice/ghostmesh-reasonpack-acquire@"+"b"*64+".service",
             "/system.slice/other"+expected,
+            "/user.slice/user-1001.slice/user@1001.service/app.slice/"+expected,
+            "/malicious.slice/"+expected,
             "",
         ):
             with self.subTest(cgroup=cgroup),self.assertRaises(ValueError):
