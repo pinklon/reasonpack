@@ -90,6 +90,13 @@ class ImportTests(unittest.TestCase):
                 importer.import_pack(self.src,self.out,ROOT/"bin/reasonpack")
         self.assertFalse(self.out.exists())
 
+    def test_nested_destination_does_not_mutate_source(self):
+        nested=self.src/"derived"/"canonical"
+        with self.assertRaisesRegex(ValueError,"outside the verified source"):
+            importer.import_pack(self.src,nested,Path(__file__))
+        self.assertFalse((self.src/"derived").exists())
+        importer.verify_original(self.src)
+
     def test_extra_file_rejected(self):
         (self.src/"extra.bin").write_bytes(b"extra")
         with self.assertRaisesRegex(ValueError,"untracked"):

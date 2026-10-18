@@ -90,6 +90,10 @@ def verify_original(src:Path):
 
 def import_pack(src,out,refkit):
     manifest,url,original=verify_original(src)
+    source_root=src.resolve()
+    target=out.resolve()
+    if source_root==target or source_root in target.parents:
+        reject("target must be outside the verified source pack")
     if out.exists() or out.is_symlink():
         reject("target already exists; no overwrites")
     if not refkit.is_file():
