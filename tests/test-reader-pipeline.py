@@ -76,6 +76,19 @@ class PipelineTests(unittest.TestCase):
         raw=json.dumps(e,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
         e["auth_tag"]=hmac.new(self.key,raw,"sha256").hexdigest()
         self.email.write_text(json.dumps(e))
+    def test_gateway_key_is_not_forwarded_to_child_processes(self):
+        spec=importlib.util.spec_from_file_location("reader_pipeline_test",ROOT/"ops/reader-pipeline.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        previous=os.environ.get("REASONPACK_MAIL_INGEST_KEY")
+        os.environ["REASONPACK_MAIL_INGEST_KEY"]=self.key.decode()
+        try:
+            child=module.execute([sys.executable,"-c",
+                                  "import os; print(os.getenv('REASONPACK_MAIL_INGEST_KEY', 'absent'))"])
+            self.assertEqual(child.strip(),"absent")
+        finally:
+            if previous is None: os.environ.pop("REASONPACK_MAIL_INGEST_KEY",None)
+            else: os.environ["REASONPACK_MAIL_INGEST_KEY"]=previous
     def cli(self,program,*args,extra_env=None):
         env=os.environ.copy()
         env["REASONPACK_MAIL_INGEST_KEY"]=self.key.decode()

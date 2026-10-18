@@ -63,7 +63,7 @@ When integrating live email, the mail responder must first validate the incoming
 
 ## Required before any Production delivery
 
-1. Integrate with the current mail responder, without replacing production binaries or restarting unrelated services. Keep key restricted to the gateway.
+1. Integrate with the current mail responder, without replacing production binaries or restarting unrelated services. Restrict the existing mail ingestion key to the authenticated gateway and explicitly qualified admission verifiers; never pass it to model or acquisition subprocesses.
 2. Implement bounded independent model-assisted claim research, with allowed external resources, timeouts, budgets, provenance, honest HOLD on failures, and an exact analysis JSON contract.
 3. Independently review factual support and thesis attribution; defend against prompt injection from incoming mail, transcript and retrieved sites.
 4. Perform owner-only email canary with exact source, generated edition and same-thread reply verification. Enforce exactly-once delivery and test rollback.
@@ -99,6 +99,8 @@ The deployed Gmail responder currently reserves each email in its durable journa
 ## Operator-only owner-canary runbook (NOT yet a live send)
 
 The mail gateway signer, installed reasoner and Gmail dispatcher have NOT been connected by this branch. An operator can exercise a previously admitted job without changing the live responder:
+
+The trusted `init` verifier needs the existing `REASONPACK_MAIL_INGEST_KEY` to check the signed envelope. The source code removes that key from subsequent subprocess environments. Key access and isolation still require separate installed-runtime qualification.
 
 ```bash
 python3 ops/reader-pipeline.py init --admission /protected/verified-request-receipt.json --envelope /protected/signed-gateway-envelope.json --allow-sender owner@example.org --root /protected/reader-jobs

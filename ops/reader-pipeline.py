@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Immutable, local-only GhostMesh ReasonPack Reader job orchestrator.
 
-No Gmail calls, external publication, model invocation, credential handling or
-service mutation. Jobs progress through explicit evidence-backed transitions.
+No Gmail calls, external publication, model invocation or service mutation.
+Initialization checks the existing signed gateway key; subprocesses never
+inherit it. Jobs progress through explicit evidence-backed transitions.
 """
 from __future__ import annotations
 
@@ -86,8 +87,10 @@ def advance(jobdir, flow, new_state, evidence):
     return {"state": new_state, "job": flow["job_id"], "evidence": evidence}
 
 def execute(command):
+    child_env=os.environ.copy()
+    child_env.pop("REASONPACK_MAIL_INGEST_KEY",None)
     p = subprocess.run(command, stdin=subprocess.DEVNULL, capture_output=True,
-                       text=True, timeout=90)
+                       text=True, timeout=90, env=child_env)
     if p.returncode:
         reject("bounded subprocess failed: " + (p.stderr[-450:] or p.stdout[-450:]))
     return p.stdout
