@@ -60,6 +60,20 @@ class LongFormTests(unittest.TestCase):
         return run("longform-segments.py","build","--pack",self.pack,
                    "--out",self.parts,"--target-bytes",target)
 
+    def test_build_refuses_output_inside_source_pack(self):
+        for out in (self.pack/"segments",self.pack/"new-parent"/"segments"):
+            with self.subTest(out=out):
+                result=run("longform-segments.py","build","--pack",self.pack,"--out",out)
+                self.assertEqual(result.returncode,2,result.stderr)
+                self.assertIn("inside source pack",result.stderr)
+                self.assertFalse((self.pack/"new-parent").exists())
+                self.assertFalse(out.exists())
+        alias=self.t/"source-alias"
+        alias.symlink_to(self.pack,target_is_directory=True)
+        result=run("longform-segments.py","build","--pack",self.pack,"--out",alias/"segments")
+        self.assertEqual(result.returncode,2,result.stderr)
+        self.assertFalse((self.pack/"segments").exists())
+
     def test_three_hour_transcript_is_not_rejected(self):
         self.assertGreater(len(self.raw),140_000)
         p=self.build()
