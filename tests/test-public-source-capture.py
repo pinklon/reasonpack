@@ -49,6 +49,7 @@ class CaptureTests(unittest.TestCase):
         self.packet=self.root/"packet.json"
         self.packet.write_text(json.dumps({
             "schema":"ghostmesh.reasonpack.editorial-packet.v1",
+            "source_url":"https://www.youtube.com/watch?v=jNQXAC9IVRw",
             "source_manifest_sha256":"a"*64,
             "transcript_sha256":"b"*64
         }))
@@ -63,7 +64,31 @@ class CaptureTests(unittest.TestCase):
         Connection.addresses=[]
     def save_catalog(self):
         self.catalog.write_text(json.dumps({"schema":"ghostmesh.reasonpack.approved-research-catalog.v1",
-             "operator_curated_for_private_research":True,"sources":[self.source]}))
+             "operator_curated_for_private_research":True,"video_id":"jNQXAC9IVRw",
+             "sources":[self.source]}))
+    def test_catalog_for_different_video_rejected(self):
+        catalog=json.loads(self.catalog.read_text())
+        catalog["video_id"]="ZhM29Ds-mBg"
+        self.catalog.write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(ValueError,"video"):
+            mod.collect(self.packet,self.catalog,self.out,private_test_override=True,
+                        fetcher=lambda _: (PAGE,"text/html","8.8.8.8"))
+        self.assertFalse(self.out.exists())
+
+    def test_rewritten_excerpt_and_receipt_digest_rejected(self):
+        mod.collect(self.packet,self.catalog,self.out,private_test_override=True,
+                    fetcher=lambda _: (PAGE,"text/html","8.8.8.8"))
+        registry_path=self.out/"research-evidence.json"
+        receipt_path=self.out/"capture-receipt.json"
+        registry=json.loads(registry_path.read_text())
+        registry["sources"][0]["excerpt"]=self.source["needle"]
+        registry["sources"][0]["excerpt_sha256"]=sha256(self.source["needle"].encode()).hexdigest()
+        registry_path.write_text(json.dumps(registry))
+        receipt=json.loads(receipt_path.read_text())
+        receipt["evidence_register_sha256"]=sha256(registry_path.read_bytes()).hexdigest()
+        receipt_path.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError,"excerpt"):
+            mod.verify_capture(self.packet,self.catalog,self.out,private_test_override=True)
     def test_html_content_and_explicit_excerpt_match(self):
         def fake_fetch(url):
             return PAGE,"text/html","8.8.8.8"

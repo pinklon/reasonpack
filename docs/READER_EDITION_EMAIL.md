@@ -87,7 +87,7 @@ Before integration, compare the specific source release used for the patch to li
 
 ## New v0.4 local orchestrator and gateway handoff
 
-- ops/reader-pipeline.py adds monotonic, receipt-backed, locked transitions: admitted → source-verified → awaiting-research → analysis-unreviewed → reader-private-draft → email-private-draft. It checks source hashes on every downstream transition, creates only local files, and never sends.
+- ops/reader-pipeline.py adds monotonic, receipt-backed, locked transitions: admitted → source-verified → awaiting-research → research-evidence-verified → analysis-unreviewed → reader-private-draft → email-private-draft. Initialization rechecks the signed gateway envelope and explicit sender allowlist using the acquisition supervisor's existing source verifier. It checks source hashes on every downstream transition, creates only local files, and never sends.
 - ops/mail-gateway-adapter.py is an import-only, owner-only canary helper. It may sign a verified Gmail envelope *only after* the live responder has independently authenticated and admitted the sender. It preserves Gmail message and thread IDs and does not authenticate any incoming email itself. Key access must remain restricted to that boundary.
 - Public owner-authored thesis context is restricted to versioned files committed under editorial/approved-works. Their source Git revision and source blob identity are carried as metadata. This does not make model-generated text author-approved. Public route reachability has not been verified; do not advertise any URL as accessible until probed.
 - CI now runs gateway-adapter and synthetic full-lifecycle tests. The synthetic pack is structurally hash-valid for testing but NOT an actual acquired YouTube video; production requires independent acquisition custody and live-source evidence.
@@ -101,11 +101,15 @@ The deployed Gmail responder currently reserves each email in its durable journa
 The mail gateway signer, installed reasoner and Gmail dispatcher have NOT been connected by this branch. An operator can exercise a previously admitted job without changing the live responder:
 
 ```bash
-python3 ops/reader-pipeline.py init --admission /protected/verified-request-receipt.json --root /protected/reader-jobs
+python3 ops/reader-pipeline.py init --admission /protected/verified-request-receipt.json --envelope /protected/signed-gateway-envelope.json --allow-sender owner@example.org --root /protected/reader-jobs
 python3 ops/reader-pipeline.py source --job /protected/reader-jobs/JOBID --pack /protected/verified-source-pack
 python3 ops/reader-pipeline.py research --job /protected/reader-jobs/JOBID
-# Research-input.json is untrusted source material. A separately authorized researcher must
-# evaluate the actual video and independent references and write analysis-v1.json.
+# The registry lists separately collected evidence. A URL or registry entry does not
+# establish claim truth; the captured-source path also requires --capture-dir and --catalog.
+python3 ops/reader-pipeline.py evidence --job /protected/reader-jobs/JOBID --registry /protected/research-sources.json
+python3 ops/reader-pipeline.py compose --job /protected/reader-jobs/JOBID
+# A separately authorized researcher must evaluate the actual video and sources and
+# write analysis-v1.json. The composition step only prepares context; it invokes no model.
 python3 ops/reader-pipeline.py analysis --job /protected/reader-jobs/JOBID --analysis /protected/analysis-v1.json
 python3 ops/reader-pipeline.py render --job /protected/reader-jobs/JOBID
 python3 ops/reader-pipeline.py draft --job /protected/reader-jobs/JOBID --from-email ghostmesh@malott.ai

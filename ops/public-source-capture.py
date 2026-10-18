@@ -20,7 +20,7 @@ import signal
 import socket
 import ssl
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 MAX_BODY=2_000_000
 MAX_TEXT=160_000
@@ -32,6 +32,7 @@ HOST_ALLOW=frozenset({
 })
 ID=re.compile(r"^src-[0-9a-z]{4,24}$")
 HASH=re.compile(r"^[0-9a-f]{64}$")
+VIDEO_ID=re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 def fail(reason):
     raise ValueError(reason)
@@ -49,6 +50,30 @@ def safe_source(url):
     if len(part.path)>800 or len(part.query)>500 or "//" in part.path:
         fail("malformed approved URL path")
     return host,(part.path or "/")+("?" + part.query if part.query else "")
+
+def packet_video_id(packet):
+    url=packet.get("source_url")
+    if not isinstance(url,str):
+        fail("missing canonical video URL")
+    part=urlsplit(url)
+    host=(part.hostname or "").lower()
+    if (part.scheme!="https" or part.username or part.password or
+            part.port not in (None,443) or part.fragment):
+        fail("invalid canonical video URL")
+    if host=="youtu.be" and not part.query:
+        video_id=part.path.removeprefix("/")
+    elif host in ("youtube.com","www.youtube.com","m.youtube.com") and part.path=="/watch":
+        values=parse_qs(part.query).get("v",[])
+        video_id=values[0] if len(values)==1 else ""
+    else:
+        fail("invalid canonical video URL")
+    if not VIDEO_ID.fullmatch(video_id):
+        fail("invalid canonical video ID")
+    return video_id
+
+def verify_catalog_video(packet,catalog):
+    if catalog["video_id"]!=packet_video_id(packet):
+        fail("research catalog video ID does not match source packet")
 
 class PinnedConnection(HTTPSConnection):
     def __init__(self,host,peer,timeout):
@@ -156,6 +181,8 @@ def load_catalog(path, *, private_test_override=False):
     if catalog.get("schema")!="ghostmesh.reasonpack.approved-research-catalog.v1" or catalog.get("operator_curated_for_private_research") is not True:
         fail("unapproved research catalog")
     entries=catalog.get("sources")
+    if not isinstance(catalog.get("video_id"),str) or not VIDEO_ID.fullmatch(catalog["video_id"]):
+        fail("catalog requires valid video ID")
     if not isinstance(entries,list) or not 1<=len(entries)<=MAX_SOURCES:
         fail("catalog size invalid")
     used_ids=set()
@@ -188,6 +215,7 @@ def collect(packet_path,catalog_path,outdir,*,fetcher=None,private_test_override
         if not isinstance(packet.get(field),str) or not HASH.fullmatch(packet[field]):
             fail("invalid "+field)
     catalog=load_catalog(catalog_path,private_test_override=private_test_override)
+    verify_catalog_video(packet,catalog)
     # Exact snapshots carry the source transcript and approved source list lineage.
     captures=[]
     raw_snapshots=[]
@@ -260,6 +288,7 @@ def verify_capture(packet_path,catalog_path,folder,*,private_test_override=False
     if not isinstance(records,list) or len(records)!=len(catalog["sources"]):
         fail("captured source inventory mismatch")
     packet=json.loads(packet_path.read_text("utf-8"))
+    verify_catalog_video(packet,catalog)
     if registry.get("source_manifest_sha256")!=packet.get("source_manifest_sha256") or registry.get("transcript_sha256")!=packet.get("transcript_sha256"):
         fail("evidence registry not bound to exact source pack")
     snapdir=folder/"snapshots"
@@ -292,13 +321,13 @@ def verify_capture(packet_path,catalog_path,folder,*,private_test_override=False
             fail("text extraction hash mismatch")
         if source.get("excerpt_sha256")!=digest(source.get("excerpt","").encode("utf-8")):
             fail("evidence excerpt hash mismatch")
-        if source.get("excerpt","") not in actual_text:
-            fail("evidence excerpt no longer matches raw source")
         needle=re.sub(r"\s+"," ",row["needle"]).strip()
-        if not re.search(re.escape(needle),actual_text,re.IGNORECASE):
+        match=re.search(re.escape(needle),actual_text,re.IGNORECASE)
+        if not match:
             fail("reviewed source needle absent in preserved bytes")
-        if not re.match(re.escape(needle),source["excerpt"],re.IGNORECASE):
-            fail("excerpt does not begin with reviewed source needle")
+        expected_excerpt=actual_text[match.start():][:min(1400,len(actual_text))]
+        if source.get("excerpt")!=expected_excerpt:
+            fail("evidence excerpt differs from the exact captured excerpt")
     actual={x.name for x in snapdir.iterdir()}
     if actual!=allowed:
         fail("unexpected or missing source snapshot members")

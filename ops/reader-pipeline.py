@@ -96,16 +96,23 @@ def init(args):
     receipt_raw = args.admission.read_bytes()
     if len(receipt_raw) > 40_000:
         reject("oversized admission receipt")
-    receipt = json.loads(receipt_raw)
-    jid = receipt.get("job_id", "")
-    vid = receipt.get("video_id", "")
-    if (receipt.get("schema") != "ghostmesh.reasonpack.mail-job.v1"
-            or receipt.get("status") != "admitted-awaiting-acquisition"
-            or not isinstance(jid, str) or not HEX64.fullmatch(jid)
-            or not isinstance(vid, str) or not VIDEO.fullmatch(vid)
-            or receipt.get("publication_authority") is not False
-            or receipt.get("email_dispatch_authority") is not False):
-        reject("invalid admitted request")
+    supervisor = import_script("acquisition-supervisor")
+    receipt = supervisor.validate_admission(receipt_raw)
+    if receipt.get("admission_scope") != "mail-gateway-signed-and-sender-allowlisted":
+        reject("invalid admission scope")
+    envelope_raw = args.envelope.read_bytes()
+    if len(envelope_raw) > 35_000:
+        reject("oversized signed gateway envelope")
+    # Reuse the acquisition supervisor's signed-envelope and sender-policy
+    # contract. Pin one read so a changing path cannot split the verification.
+    class PinnedEnvelope:
+        def read_bytes(self):
+            return envelope_raw
+    gateway_sha = supervisor.verified_gateway(receipt, PinnedEnvelope(), args.allow_sender)
+    if receipt.get("subject") != json.loads(envelope_raw).get("subject"):
+        reject("receipt subject differs from signed gateway subject")
+    jid = receipt["job_id"]
+    vid = receipt["video_id"]
     # Directory is provisioned without widening access to any other job.
     args.root.mkdir(parents=True, exist_ok=True, mode=0o700)
     target = args.root / jid
@@ -113,11 +120,14 @@ def init(args):
         flow = state(target)
         if flow["admission_sha256"] != digest(receipt_raw):
             reject("job ID reused with changed admission")
+        if flow.get("signed_gateway_sha256") != gateway_sha:
+            reject("job ID reused with changed signed gateway")
         return {"state": flow["state"], "job": jid, "status": "duplicate"}
     target.mkdir(mode=0o700)
     protect_write(target / "admission.json", receipt_raw)
     flow = {"schema": SCHEMA, "job_id": jid, "video_id": vid,
             "admission_sha256": digest(receipt_raw),
+            "signed_gateway_sha256": gateway_sha,
             "state": "admitted", "events": [],
             "created_at_utc": utc_now(), "updated_at_utc": utc_now(),
             "publication_authority": False, "dispatch_authority": False}
@@ -349,6 +359,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest="step", required=True)
     initp = sub.add_parser("init"); initp.add_argument("--admission", type=Path, required=True); initp.add_argument("--root", type=Path, required=True)
+    initp.add_argument("--envelope", type=Path, required=True)
+    initp.add_argument("--allow-sender", action="append", required=True)
     source = sub.add_parser("source"); source.add_argument("--job", type=Path, required=True); source.add_argument("--pack", type=Path, required=True)
     research = sub.add_parser("research"); research.add_argument("--job", type=Path, required=True); research.add_argument("--public-work", type=Path, action="append", default=[])
     evidence = sub.add_parser("evidence"); evidence.add_argument("--job",type=Path,required=True); evidence.add_argument("--registry",type=Path,required=True)
