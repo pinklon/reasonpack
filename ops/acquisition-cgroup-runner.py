@@ -40,10 +40,8 @@ def verify_containment(job_id,cgroup=None):
         refuse("invalid immutable job identity")
     current=cgroup if cgroup is not None else cgroup_path()
     unit=UNIT_PREFIX+job_id+".service"
-    if not isinstance(current,str) or not re.search(r"(?:^|/)"+re.escape(unit)+r"$",current):
+    if current != "/system.slice/"+unit:
         refuse("real acquisition must be inside exact approved systemd instance cgroup")
-    if current.count("/"+unit)!=1:
-        refuse("ambiguous unit/cgroup identity")
     return unit
 
 def verify_install_contract(unit_text):
