@@ -280,6 +280,24 @@ def whole_video_prompt(composition,plan,root,root_digest):
     if len(raw)>MAX_NODE_BYTES:hold("whole-video prompt exceeds bounded model context")
     return raw
 
+def whole_video_output_schema(composition,prompt_sha):
+    if not isinstance(prompt_sha,str) or not SHA.fullmatch(prompt_sha):
+        hold("invalid final prompt identity")
+    contract=jd((composition/"analysis-schema.json").read_bytes())
+    if not isinstance(contract,dict) or contract.get("type")!="object":
+        hold("invalid final analysis schema")
+    properties=contract.get("properties")
+    required=contract.get("required",[])
+    if not isinstance(properties,dict) or not isinstance(required,list):
+        hold("invalid final analysis fields")
+    properties["whole_video_prompt_sha256"]={"type":"string","enum":[prompt_sha]}
+    if "whole_video_prompt_sha256" not in required:
+        required.append("whole_video_prompt_sha256")
+    contract["required"]=required
+    bound=payload(contract)
+    if len(bound)>MAX_OUTPUT_BYTES:hold("final analysis schema exceeds output budget")
+    return bound
+
 def verify_complete(composition,results,root):
     plan=verify_base(composition,results,root)
     nodes=[]
@@ -291,6 +309,8 @@ def verify_complete(composition,results,root):
         hold("unrecognized or missing synthesis node checkpoint")
     root_digest=nodes[-1]["candidate_sha256"]
     final_prompt=whole_video_prompt(composition,plan,root,root_digest)
+    final_prompt_sha=hashbytes(final_prompt)
+    final_schema=whole_video_output_schema(composition,final_prompt_sha)
     output={"schema":COVERAGE_SCHEMA,"status":"all-segments-reconciled-unreviewed",
        "source_video_id":plan["source_video_id"],
        "source_research_packet_sha256":plan["source_research_packet_sha256"],
@@ -298,8 +318,8 @@ def verify_complete(composition,results,root):
        "synthesis_plan_sha256":hashbytes((root/"plan.json").read_bytes()),
        "segments_covered":plan["segment_count"],"nodes_verified":len(nodes),
        "root_node_id":plan["root_node_id"],"root_candidate_sha256":root_digest,
-       "whole_video_prompt_sha256":hashbytes(final_prompt),
-       "whole_video_output_schema_sha256":hashbytes((composition/"analysis-schema.json").read_bytes()),
+       "whole_video_prompt_sha256":final_prompt_sha,
+       "whole_video_output_schema_sha256":hashbytes(final_schema),
        "node_candidate_receipts":nodes,
        "semantic_review":"NOT_ATTESTED","model_execution":"NOT_ATTESTED",
        "email_dispatch_authority":False,"public_release":False}
@@ -313,6 +333,12 @@ def seal(composition,results,root):
     if p.exists():
         if p.is_symlink() or p.read_bytes()!=generated:hold("whole-video model input has changed")
     else:private_write(p,generated)
+    schema_path=root/"whole-video-output-schema.json"
+    bound_schema=whole_video_output_schema(composition,output["whole_video_prompt_sha256"])
+    if schema_path.exists():
+        if schema_path.is_symlink() or schema_path.read_bytes()!=bound_schema:
+            hold("final whole-video output schema has changed")
+    else:private_write(schema_path,bound_schema)
     f=root/"coverage-receipt.json"
     if f.exists():
         if f.read_bytes()!=raw:hold("coverage receipt changed")
@@ -330,6 +356,11 @@ def verify(composition,results,root):
             or prompt.read_bytes()!=whole_video_prompt(composition,jd((root/"plan.json").read_bytes()),
                 root,output["root_candidate_sha256"])):
         hold("final whole-video synthesis prompt missing or altered")
+    schema_path=root/"whole-video-output-schema.json"
+    if (not schema_path.is_file() or schema_path.is_symlink() or
+            schema_path.read_bytes()!=whole_video_output_schema(
+                composition,output["whole_video_prompt_sha256"])):
+        hold("final whole-video output schema missing or altered")
     return output
 
 def main():
