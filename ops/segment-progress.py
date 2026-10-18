@@ -44,7 +44,8 @@ def load_composition(folder):
 def check_candidate(record,entry):
     if not isinstance(record,dict) or record.get("schema")!=SCHEMA:
         deny("invalid candidate schema")
-    if record.get("segment_index")!=entry["index"]:
+    segment_index=record.get("segment_index")
+    if type(segment_index) is not int or segment_index!=entry["index"]:
         deny("candidate points to wrong segment index")
     if record.get("segment_sha256")!=entry["segment_sha256"] or record.get("prompt_sha256")!=entry["prompt_sha256"]:
         deny("candidate refers to wrong exact segment/prompt")
