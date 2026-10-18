@@ -90,6 +90,10 @@ def emit_segments(transcript,directory,target):
 def build(pack,out,target,repo):
     if out.exists() or out.is_symlink():refuse("segment destination exists")
     if not pack.is_dir() or pack.is_symlink():refuse("pack path invalid")
+    # The pack is immutable source input. Resolve existing parent symlinks as
+    # well as lexical nesting before creating any destination directories.
+    if out.resolve().is_relative_to(pack.resolve()):
+        refuse("segment destination is inside source pack")
     v=subprocess.run([str(repo/"bin/reasonpack"),"verify",str(pack)],
                      capture_output=True,text=True,timeout=90)
     if v.returncode:refuse("canonical source verifier rejected pack")

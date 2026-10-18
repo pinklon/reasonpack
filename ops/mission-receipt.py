@@ -22,12 +22,15 @@ SHA=re.compile(r"^[0-9a-f]{64}$")
 def deny(s):raise ValueError(s)
 def digest(raw):return sha256(raw).hexdigest()
 
-def make(kind,surface,source_event_fingerprint,out):
-    if kind not in KINDS or surface not in SURFACES:
+def mission_identity(kind,surface,source_event_fingerprint):
+    if not isinstance(kind,str) or not isinstance(surface,str) or kind not in KINDS or surface not in SURFACES:
         deny("invalid mission type or source")
     if not isinstance(source_event_fingerprint,str) or not SHA.fullmatch(source_event_fingerprint):
         deny("source must be a privacy-preserving event SHA-256")
-    identity=digest(("ghostmesh.mission.v1\0"+surface+"\0"+source_event_fingerprint+"\0"+kind).encode())
+    return digest(("ghostmesh.mission.v1\0"+surface+"\0"+source_event_fingerprint+"\0"+kind).encode())
+
+def make(kind,surface,source_event_fingerprint,out):
+    identity=mission_identity(kind,surface,source_event_fingerprint)
     request={
       "schema":SCHEMA,"mission_id":identity,"kind":kind,"surface":surface,
       "source_event_fingerprint":source_event_fingerprint,
@@ -56,6 +59,9 @@ def project(mission_path,workflow_path):
     mission=json.loads(mission_path.read_text("utf-8"))
     if mission.get("schema")!=SCHEMA or mission.get("payment_provider_connected") is not False:
         deny("invalid or payment-enabled mission receipt")
+    if mission.get("mission_id")!=mission_identity(mission.get("kind"),mission.get("surface"),
+                                                  mission.get("source_event_fingerprint")):
+        deny("mission identity does not match its source")
     records=[]
     if workflow_path:
         flow=json.loads(workflow_path.read_text("utf-8"))
