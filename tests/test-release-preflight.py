@@ -13,6 +13,9 @@ import unittest
 from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
+# The module sets this flag, but importlib may cache its bytecode before the
+# first line executes. Keep this test runner clean before loading it.
+sys.dont_write_bytecode = True
 sp=importlib.util.spec_from_file_location("release_preflight_tests",ROOT/"ops/release-preflight.py")
 P=importlib.util.module_from_spec(sp)
 sp.loader.exec_module(P)

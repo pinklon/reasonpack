@@ -60,6 +60,17 @@ class MissionReceiptTests(unittest.TestCase):
               "--event-sha256","recipient@example.org","--out",self.mission)
         self.assertEqual(p.returncode,2)
         self.assertFalse(self.mission.exists())
+    def test_projection_recomputes_mission_identity(self):
+        self.assertEqual(self.create().returncode,0)
+        original=json.loads(self.mission.read_text())
+        for changes in ({"mission_id":"0"*64},
+                        {"source_event_fingerprint":"1"*64},
+                        {"surface":"owner"}):
+            with self.subTest(changes=changes):
+                self.mission.write_text(json.dumps(original | changes))
+                result=cli("project","--mission",self.mission)
+                self.assertEqual(result.returncode,2,result.stdout)
+                self.assertIn("mission identity",result.stderr)
     def test_workflow_projection_is_deterministic_not_paid(self):
         self.assertEqual(self.create().returncode,0)
         wf=self.d/"workflow.json"
