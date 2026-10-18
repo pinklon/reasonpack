@@ -54,7 +54,7 @@ def inputs(packet_path,registry_path):
         refuse("invalid source video ID")
     return packet,registry,{"packet_sha256":digest(packet_raw),"registry_sha256":digest(registry_raw),"video_id":vid}
 
-def schema():
+def schema(segmented=False):
     text={"type":"string","minLength":1}
     source={"type":"object","additionalProperties":False,
             "required":["label","url"],"properties":{"label":text,"url":text}}
@@ -69,7 +69,7 @@ def schema():
     thesis={"type":"object","additionalProperties":False,
             "required":["title","argument","mechanism","counterargument","implication"],
             "properties":{n:text for n in ("title","argument","mechanism","counterargument","implication")}}
-    return {"type":"object","additionalProperties":False,
+    result={"type":"object","additionalProperties":False,
             "required":["schema","video_id","headline","deck","executive","source_account",
                         "evidence_summary","claims","thesis","shareplane_works"],
             "properties":{
@@ -80,6 +80,11 @@ def schema():
                 "thesis":thesis,
                 "shareplane_works":{"type":"array","maxItems":12,"items":work}
             }}
+    if segmented:
+        result["required"].append("whole_video_prompt_sha256")
+        result["properties"]["whole_video_prompt_sha256"]={
+            "type":"string","pattern":"^[0-9a-f]{64}$"}
+    return result
 
 def segment_candidate_schema(index,segment_sha,prompt_sha):
     text={"type":"string","minLength":1,"maxLength":1000}
@@ -127,7 +132,7 @@ def safe_write(path,raw):
 def prepare(args):
     packet,registry,identity=inputs(args.packet,args.registry)
     if args.out.exists():refuse("composition directory already exists")
-    schema_raw=(json.dumps(schema(),indent=2)+"\n").encode()
+    schema_raw=(json.dumps(schema(packet.get("transcript_mode")=="segmented"),indent=2)+"\n").encode()
     prompt_raw=prompt(packet,registry,identity).encode("utf-8")
     if len(prompt_raw)>180_000:
         refuse("composed reasoning prompt exceeds 180 KB; segment source context")
@@ -232,6 +237,8 @@ def validate(args):
                 synthesis_proof.get("segments_covered")!=packet.get("segment_count") or
                 synthesis_proof.get("semantic_review")!="NOT_ATTESTED"):
             refuse("synthesis coverage source identity does not match long-form research")
+        if candidate.get("whole_video_prompt_sha256")!=synthesis_proof.get("whole_video_prompt_sha256"):
+            refuse("final analysis is not bound to the sealed whole-video prompt")
     elif args.synthesis or args.composition or args.segment_results:
         refuse("inline analysis cannot claim segmented synthesis")
     ev=mod("research-evidence")

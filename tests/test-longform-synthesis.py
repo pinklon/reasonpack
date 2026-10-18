@@ -104,11 +104,19 @@ class SynthesisTests(unittest.TestCase):
         final_prompt=(self.synth/"whole-video-model-input.json")
         self.assertTrue(final_prompt.is_file())
         self.assertEqual(r["whole_video_prompt_sha256"],__import__('hashlib').sha256(final_prompt.read_bytes()).hexdigest())
+        final_schema=self.synth/"whole-video-output-schema.json"
+        contract=json.loads(final_schema.read_text())
+        self.assertEqual(contract["properties"]["whole_video_prompt_sha256"]["enum"],
+                         [r["whole_video_prompt_sha256"]])
+        self.assertEqual(r["whole_video_output_schema_sha256"],
+                         __import__('hashlib').sha256(final_schema.read_bytes()).hexdigest())
         self.assertEqual(json.loads(final_prompt.read_text())["bounded_evidence"]["whole_video_synthesis"]["segment_count"],self.n)
         self.assertFalse(r["email_dispatch_authority"])
         self.assertEqual(self.call("verify").returncode,0)
         self.assertEqual(json.loads(self.call("seal").stdout)["coverage_sha256"],
                          json.loads(sealed.stdout)["coverage_sha256"])
+        final_schema.write_text(final_schema.read_text()+" ")
+        self.assertEqual(self.call("verify").returncode,2)
     def test_missing_leaf_holds(self):
         (self.results/"segment-000007.json").unlink()
         p=self.call("init")
@@ -216,6 +224,24 @@ class SynthesisTests(unittest.TestCase):
         full=subprocess.run([sys.executable,str(ROOT/"ops/research-composer.py"),*map(str,base),
                 "--synthesis",str(self.synth),"--composition",str(self.comp),
                 "--segment-results",str(self.results)],text=True,capture_output=True)
+        self.assertEqual(full.returncode,2)
+        self.assertIn("sealed whole-video prompt",full.stderr)
+        data["whole_video_prompt_sha256"]="0"*64
+        final.write_text(json.dumps(data))
+        wrong=subprocess.run([sys.executable,str(ROOT/"ops/research-composer.py"),*map(str,base),
+                 "--synthesis",str(self.synth),"--composition",str(self.comp),
+                 "--segment-results",str(self.results)],text=True,capture_output=True)
+        self.assertEqual(wrong.returncode,2)
+        self.assertIn("sealed whole-video prompt",wrong.stderr)
+        contract=json.loads((self.synth/"whole-video-output-schema.json").read_text())
+        data["whole_video_prompt_sha256"]=contract["properties"][
+            "whole_video_prompt_sha256"]["enum"][0]
+        self.assertEqual(data["whole_video_prompt_sha256"],hashlib.sha256(
+            (self.synth/"whole-video-model-input.json").read_bytes()).hexdigest())
+        final.write_text(json.dumps(data))
+        full=subprocess.run([sys.executable,str(ROOT/"ops/research-composer.py"),*map(str,base),
+                 "--synthesis",str(self.synth),"--composition",str(self.comp),
+                 "--segment-results",str(self.results)],text=True,capture_output=True)
         self.assertEqual(full.returncode,0,full.stderr)
         receipt=json.loads((self.root/"validated.json").read_text())
         self.assertEqual(receipt["all_segment_coverage_status"],"complete-unreviewed")
@@ -223,6 +249,18 @@ class SynthesisTests(unittest.TestCase):
         self.assertFalse(receipt["email_dispatch_authority"])
         self.assertEqual(receipt["all_segment_coverage_sha256"],
             hashlib.sha256((self.synth/"coverage-receipt.json").read_bytes()).hexdigest())
+
+    def test_segmented_analysis_schema_requires_prompt_identity(self):
+        spec=importlib.util.spec_from_file_location(
+            "research_composer_schema_under_test",ROOT/"ops/research-composer.py")
+        composer=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(composer)
+        inline=composer.schema()
+        segmented=composer.schema(segmented=True)
+        self.assertNotIn("whole_video_prompt_sha256",inline["properties"])
+        self.assertIn("whole_video_prompt_sha256",segmented["required"])
+        self.assertEqual(segmented["properties"]["whole_video_prompt_sha256"]["pattern"],
+                         "^[0-9a-f]{64}$")
 
     def test_valid_large_unicode_segment_observations_fit_prompt(self):
         for i in (0,1):
