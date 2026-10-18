@@ -263,4 +263,23 @@ class LongFormTests(unittest.TestCase):
         self.assertEqual(p.returncode,2)
         self.assertIn("segment custody",p.stderr)
 
+class SegmentCandidateIndexTests(unittest.TestCase):
+    def test_boolean_indices_do_not_alias_integer_segments(self):
+        spec=importlib.util.spec_from_file_location(
+            "segment_progress_index_under_test",ROOT/"ops/segment-progress.py")
+        module=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for index,boolean in ((0,False),(1,True)):
+            with self.subTest(index=index):
+                entry={"index":index,"segment_sha256":"a"*64,"prompt_sha256":"b"*64}
+                candidate={"schema":module.SCHEMA,"segment_index":boolean,
+                    "segment_sha256":entry["segment_sha256"],
+                    "prompt_sha256":entry["prompt_sha256"],
+                    "observations":["Synthetic segment observation"],
+                    "source_truth_attested":False,"final_answer_authorized":False}
+                with self.assertRaisesRegex(ValueError,"wrong segment index"):
+                    module.check_candidate(candidate,entry)
+                candidate["segment_index"]=index
+                module.check_candidate(candidate,entry)
+
 if __name__=="__main__": unittest.main(verbosity=2)
