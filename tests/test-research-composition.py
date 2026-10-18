@@ -81,6 +81,16 @@ class CompositionTests(unittest.TestCase):
         self.assertFalse(r["email_dispatch_authority"])
         self.assertEqual(r["bound_citation_count"],1)
 
+    def test_prompt_explains_exact_registry_title_citation_contract(self):
+        p=self.prepare()
+        self.assertEqual(p.returncode,0,p.stderr)
+        prompt=json.loads((self.bundle/"model-prompt.json").read_text())
+        self.assertEqual(prompt["bounded_evidence"]["research_evidence"][0]["title"],
+                         self.content["claims"][0]["sources"][0]["label"])
+        self.assertTrue(any("title exactly into its citation label" in rule
+                            for rule in prompt["rules"]))
+        self.assertEqual(self.validate().returncode,0)
+
     def test_unregistered_url_rejected(self):
         self.content["claims"][0]["sources"]=[{"label":"Fake","url":"https://example.com/ghost"}]
         self.analysis.write_text(json.dumps(self.content))
