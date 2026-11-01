@@ -79,6 +79,42 @@ class DirectPackTests(unittest.TestCase):
         result=subprocess.run([str(ROOT/"bin/reasonpack"),"verify",str(target)],
                               capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stderr)
+    def test_ytdlp_metadata_larger_than_previous_8mb_limit_is_preserved(self):
+        # Real acquisition #29 returned 8,904,927 bytes before any media step.
+        def runner(argv,*,stdout=None):
+            if "--dump-single-json" in argv:
+                self.calls.append(list(argv))
+                metadata={"id":"jEOUUAPC1sc","is_live":False,"duration":30.5,
+                          "subtitles":{"en-orig":[{"ext":"vtt"}]},
+                          "verbose_unused_catalog":"X"*8_904_927}
+                stdout.write(json.dumps(metadata).encode())
+                return
+            self.fake_run(argv,stdout=stdout)
+        target=self.tmp/"large-metadata"
+        result=self.build_fast(target,run=runner,probe_media=self.fake_probe)
+        self.assertEqual(result["status"],"canonical-direct-remux-verified")
+        self.assertGreater((target/"source.json").stat().st_size,8_904_927)
+        self.assertLess((target/"source.json").stat().st_size,M.MAX_SOURCE_JSON)
+        self.assertEqual(json.loads((target/"source.json").read_text())["id"],
+                         "jEOUUAPC1sc")
+        self.assertTrue((target/"checksums.sha256").is_file())
+
+    def test_metadata_safety_ceiling_still_fails_before_media_download(self):
+        from unittest.mock import patch
+        def runner(argv,*,stdout=None):
+            self.calls.append(list(argv))
+            if "--dump-single-json" in argv:
+                stdout.write(b"X"*1025)
+                return
+            self.fail("oversized metadata must stop before media download")
+        target=self.tmp/"oversized-metadata"
+        with patch.object(M,"MAX_SOURCE_JSON",1024):
+            with self.assertRaisesRegex(ValueError,"source metadata too large"):
+                self.build_fast(target,run=runner,probe_media=self.fake_probe)
+        self.assertFalse(target.exists())
+        self.assertFalse(list(self.tmp.glob(".reasonpack-fast-stage-*")))
+        self.assertEqual(len(self.calls),1)
+
     def test_duplicate_destination_fails_before_external_calls(self):
         t=self.tmp/"already"
         t.mkdir()
