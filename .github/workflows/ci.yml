@@ -22,3 +22,7 @@ jobs:
         run: ./tests/test-package.sh
       - name: Isolated Reader depth and composition tests
         run: python3 tests/test-research-composition.py -q
+      - name: Long-form segment custody tests
+        run: python3 tests/test-longform-segments.py -q
+      - name: Long-form synthesis and composition tests
+        run: python3 tests/test-longform-synthesis.py -q
