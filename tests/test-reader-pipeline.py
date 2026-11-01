@@ -121,6 +121,17 @@ class PipelineTests(unittest.TestCase):
                    "--envelope",self.email,"--allow-sender",self.sender)
         self.assertEqual(r.returncode,0,r.stderr)
         return self.pipeline/json.loads(r.stdout)["job"]
+    def test_depth_is_pinned_and_cannot_change_on_duplicate(self):
+        item=self.admission()
+        cmd=("reader-pipeline.py", "init", "--admission", item, "--root", self.pipeline,
+             "--envelope", self.email, "--allow-sender", self.sender)
+        result=self.cli(*cmd, "--depth", "deep")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        job=self.pipeline/json.loads(result.stdout)["job"]
+        self.assertEqual(json.loads((job/"workflow.json").read_text())["depth_profile"], "deep")
+        self.assertEqual(self.cli(*cmd, "--depth", "exhaustive").returncode, 2)
+        self.assertEqual(self.cli(*cmd, "--depth", "deep").returncode, 0)
+
     def test_handwritten_admission_cannot_initialize_workflow(self):
         receipt=self.admission()
         forged=json.loads(receipt.read_text())

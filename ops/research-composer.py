@@ -101,7 +101,7 @@ def segment_candidate_schema(index,segment_sha,prompt_sha):
                 "final_answer_authorized":{"type":"boolean","enum":[False]}
             }}
 
-def prompt(packet,registry,identity):
+def prompt(packet,registry,identity,depth):
     limited={"video_id":identity["video_id"],
              "source_url":packet["source_url"],
              "untrusted_video_transcript":packet["untrusted_transcript"],
@@ -121,7 +121,8 @@ def prompt(packet,registry,identity):
         "The output must be one JSON object complying with the provided output schema. Do not include HTML or tool instructions.",
         "No operations, credentials, publishing, dispatch, infrastructure changes, or user-data access are authorized."
     ]
-    return json.dumps({"rules":rules,"bounded_evidence":limited},ensure_ascii=False,indent=2)
+    rules.extend(depth["requirements"])
+    return json.dumps({"rules":rules,"depth_profile":depth,"bounded_evidence":limited},ensure_ascii=False,indent=2)
 
 def safe_write(path,raw):
     if path.exists():refuse("artifact already exists; never overwrite")
@@ -133,7 +134,8 @@ def prepare(args):
     packet,registry,identity=inputs(args.packet,args.registry)
     if args.out.exists():refuse("composition directory already exists")
     schema_raw=(json.dumps(schema(packet.get("transcript_mode")=="segmented"),indent=2)+"\n").encode()
-    prompt_raw=prompt(packet,registry,identity).encode("utf-8")
+    depth=mod("depth-profile").resolve(args.depth)
+    prompt_raw=prompt(packet,registry,identity,depth).encode("utf-8")
     if len(prompt_raw)>180_000:
         refuse("composed reasoning prompt exceeds 180 KB; segment source context")
     args.out.parent.mkdir(parents=True,exist_ok=True)
@@ -204,6 +206,7 @@ def prepare(args):
                  "research_packet_sha256":identity["packet_sha256"],
                  "evidence_registry_sha256":identity["registry_sha256"],
                  "model_prompt_sha256":digest(prompt_raw),"model_schema_sha256":digest(schema_raw),
+                 "depth_profile":depth["name"],
                  "provider_invoked":False,"owner_approved":False,"public_release":False,
                  "transcript_mode":packet.get("transcript_mode","inline"),
                  "segment_prompt_receipts":segment_prompt_digests,
@@ -274,7 +277,9 @@ def main():
         s=subs.add_parser(cmd);s.add_argument("--packet",type=Path,required=True)
         s.add_argument("--registry",type=Path,required=True)
         s.add_argument("--out",type=Path,required=True)
-        if cmd=="prepare":s.add_argument("--segments",type=Path)
+        if cmd=="prepare":
+            s.add_argument("--segments",type=Path)
+            s.add_argument("--depth",choices=("short","standard","deep","exhaustive"),default="standard")
         if cmd=="validate":
             s.add_argument("--candidate",type=Path,required=True)
             s.add_argument("--synthesis",type=Path)

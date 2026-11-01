@@ -54,6 +54,8 @@ The current runtime does not automatically summarize, extract topics, generate k
 
 See `docs/PRODUCT_FEATURE_SET.md` for the authoritative CURRENT / NEXT / NOT YET contract.
 
+The separately staged Reader editorial pipeline supports selectable analysis-depth profiles (`short`, `standard`, `deep`, `exhaustive`), described in [Editorial Depth Profiles](docs/EDITORIAL_DEPTH_PROFILES.md). These govern model-prompt scope after acquisition; they do not expand acquisition authority, bypass evidence checks or imply that the Reader pipeline is installed.
+
 ## Why the package is larger than the script
 
 The tool itself is small. The engineering context around it should not be mysterious.

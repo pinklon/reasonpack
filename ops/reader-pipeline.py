@@ -96,6 +96,7 @@ def execute(command):
     return p.stdout
 
 def init(args):
+    depth = import_script("depth-profile").resolve(args.depth)["name"]
     receipt_raw = args.admission.read_bytes()
     if len(receipt_raw) > 40_000:
         reject("oversized admission receipt")
@@ -125,12 +126,15 @@ def init(args):
             reject("job ID reused with changed admission")
         if flow.get("signed_gateway_sha256") != gateway_sha:
             reject("job ID reused with changed signed gateway")
+        if flow.get("depth_profile", "standard") != depth:
+            reject("job ID reused with different depth profile")
         return {"state": flow["state"], "job": jid, "status": "duplicate"}
     target.mkdir(mode=0o700)
     protect_write(target / "admission.json", receipt_raw)
     flow = {"schema": SCHEMA, "job_id": jid, "video_id": vid,
             "admission_sha256": digest(receipt_raw),
             "signed_gateway_sha256": gateway_sha,
+            "depth_profile": depth,
             "state": "admitted", "events": [],
             "created_at_utc": utc_now(), "updated_at_utc": utc_now(),
             "publication_authority": False, "dispatch_authority": False}
@@ -253,6 +257,7 @@ def prepare_model(args):
                  "--out",str(args.job/"composition")]
         if (args.job/"segments").exists():
             command += ["--segments",str(args.job/"segments")]
+        command += ["--depth", state(args.job).get("depth_profile", "standard")]
         execute(command)
         receipt=data(args.job/"composition"/"composition-receipt.json")
         if receipt.get("status")!="model-input-ready-not-invoked":
@@ -278,6 +283,8 @@ def ingest_analysis(args):
         composition=data(args.job/"composition"/"composition-receipt.json")
         if composition.get("status")!="model-input-ready-not-invoked":
             reject("bounded composition not prepared")
+        if composition.get("depth_profile", "standard") != flow.get("depth_profile", "standard"):
+            reject("composition depth differs from job admission")
         if (composition.get("research_packet_sha256")!=digest((args.job/"research-input.json").read_bytes())
                 or composition.get("evidence_registry_sha256")!=digest(registry.read_bytes())
                 or composition.get("model_prompt_sha256")!=digest((args.job/"composition"/"model-prompt.json").read_bytes())
@@ -362,6 +369,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest="step", required=True)
     initp = sub.add_parser("init"); initp.add_argument("--admission", type=Path, required=True); initp.add_argument("--root", type=Path, required=True)
+    initp.add_argument("--depth", choices=("short", "standard", "deep", "exhaustive"), default="standard")
     initp.add_argument("--envelope", type=Path, required=True)
     initp.add_argument("--allow-sender", action="append", required=True)
     source = sub.add_parser("source"); source.add_argument("--job", type=Path, required=True); source.add_argument("--pack", type=Path, required=True)
