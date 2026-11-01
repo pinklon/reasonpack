@@ -185,7 +185,7 @@ def node_schema(n,sha,children):
                 "node_prompt_sha256":{"type":"string","enum":[sha]},
                 "child_sha256":{"type":"array","minItems":len(children),"maxItems":len(children),
                                 "prefixItems":[{"type":"string","enum":[c["sha256"]]} for c in children],
-                                "items":False},
+                                "items":{"type":"string"}},
                 "observations":{"type":"array","minItems":1,"maxItems":8,
                                 "items":{"type":"string","minLength":1,"maxLength":650}},
                 "semantic_truth_attested":{"type":"boolean","enum":[False]},
