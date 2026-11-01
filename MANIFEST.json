@@ -15,7 +15,7 @@
   },
   "referenceRuntime": {
     "path": "bin/reasonpack",
-    "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef",
+    "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506",
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
@@ -39,13 +39,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 3164,
-      "sha256": "72e2e59c8638ed7b38d99a64cd2a2bf4c9b6f57364b8eb3c55c47a33c30c51eb"
+      "bytes": 3228,
+      "sha256": "e88da8c3d512109cc4798bbe52a5e07114dff0460334bf905a676edb0fd67b6e"
     },
     {
       "path": "bin/reasonpack",
-      "bytes": 10279,
-      "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef"
+      "bytes": 11177,
+      "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506"
     },
     {
       "path": "bin/rp",
@@ -114,8 +114,8 @@
     },
     {
       "path": "docs/FEATURE_CURRENT_NEXT_NOT_YET.md",
-      "bytes": 1233,
-      "sha256": "f7e97545fef0f2404aa6db3a9ba892568e1b13c20f8081e370a313800dd1a3ec"
+      "bytes": 1349,
+      "sha256": "0f98b8069368f03bd3a4128dece9bf803d85df8d15b157d8456c0cf50cc341df"
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/PRODUCT_FEATURE_SET.md",
-      "bytes": 7978,
-      "sha256": "50bb160dd13e46560914b882a413f5d54a069420e217d34682b2eebe20edcefc"
+      "bytes": 8228,
+      "sha256": "0fb016202dbbd3ce4854d09c4fd2f78610b68b2b241dc5fbc7189909c9c97523"
     },
     {
       "path": "docs/REQUIREMENTS_TRACEABILITY.md",
@@ -244,13 +244,13 @@
     },
     {
       "path": "install/install-linux.sh",
-      "bytes": 1483,
-      "sha256": "5861a27761e72ce1725d7d0f062585681469a0b9f56c2828f06cfa6e662e559b"
+      "bytes": 1558,
+      "sha256": "ab1e71cb8907b678453949f221f2e5eb6bda41b0625063119b64ea10a4394d9c"
     },
     {
       "path": "install/install-macos.sh",
-      "bytes": 956,
-      "sha256": "86559addeedb3eb1fe6cc4397056fc98bb32cc4b6316e0e45967693bf968b5f9"
+      "bytes": 1031,
+      "sha256": "66186c1268cfd6baadfbbdc0a37d4eff09643a5d1d7a0e752cfca88769a40fbf"
     },
     {
       "path": "install/install-windows-wsl.ps1",
@@ -263,9 +263,19 @@
       "sha256": "67ff5e1d75fc6b4f255da97ff17a7a09bc4a434631ea4001c7775dbf00448e40"
     },
     {
+      "path": "ops/media-plan.py",
+      "bytes": 1273,
+      "sha256": "205a150a19bebddad6d40d3fed7fd4a5f36e666378a08b6b57fa4d6830ec45b7"
+    },
+    {
       "path": "presentation/reasonpack-vision-poster.png",
       "bytes": 1784552,
       "sha256": "c68ddc6049717db7c05e5ed2c2eb1b4e418191aaebf0904082315bc432729761"
+    },
+    {
+      "path": "tests/test-media-plan.py",
+      "bytes": 1355,
+      "sha256": "bb3b606fa7680583b81564d18a2eba8729691cec2bf90e96544885170c8d3164"
     },
     {
       "path": "tests/test-package.sh",

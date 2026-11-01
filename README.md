@@ -33,8 +33,8 @@ yt "https://www.youtube.com/watch?v=VIDEO_ID"
 
 Required members:
 
-- `video.mp4` — normalized H.264/AAC analysis copy.
-- `audio.m4a` — extracted AAC audio.
+- `video.mp4` — H.264/AAC analysis copy, copied without re-encoding when streams qualify.
+- `audio.m4a` — extracted AAC audio from the normalized video.
 - `transcript.txt` — transcript text from source captions or configured local Whisper fallback.
 - `transcript-status.json` — provenance/status for transcript creation.
 - `source.json` — source metadata captured by `yt-dlp`.

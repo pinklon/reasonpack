@@ -45,17 +45,17 @@ The downloaded source file is **temporary working material**. After a successful
 
 Creates `video.mp4` with:
 
-- H.264 video (`libx264`);
-- `yuv420p` pixel format for broad playback compatibility;
-- AAC audio when source audio exists;
+- H.264 video with `yuv420p` pixel format and AAC audio;
+- qualified H.264/yuv420p and AAC streams copied without generational re-encoding;
+- incompatible streams re-encoded with `libx264` CRF 23 / medium and AAC 128 kbps;
 - `+faststart` MP4 layout;
-- CRF 23 / medium preset in the current reference runtime.
+- a full transcode retry when the qualified primary conversion fails.
 
 **Why normalize:** downstream reasoning tools and people should not have to understand every container/codec combination YouTube happens to serve.
 
 ### 5. Audio extraction
 
-Creates `audio.m4a` with AAC audio at 128 kbps.
+Creates `audio.m4a` by losslessly extracting the AAC stream from the normalized `video.mp4`. Re-encoded source audio targets 128 kbps; already compatible source audio retains its bitrate.
 
 The audio member gives transcription and audio-only workflows a stable input without repeatedly extracting audio from video.
 
