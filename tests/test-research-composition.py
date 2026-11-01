@@ -73,6 +73,30 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual((self.bundle/"model-prompt.json").stat().st_mode & 0o777,0o600)
         self.assertEqual(self.prepare().returncode,2)
 
+    def test_all_depth_profiles_bind_to_prompt_and_receipt(self):
+        for depth in ("short", "standard", "deep", "exhaustive"):
+            target=self.root / ("composition-" + depth)
+            result=run("research-composer.py", "prepare", "--packet", self.packet,
+                       "--registry", self.registry, "--out", target, "--depth", depth)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            prompt=json.loads((target/"model-prompt.json").read_text())
+            receipt=json.loads((target/"composition-receipt.json").read_text())
+            self.assertEqual(prompt["depth_profile"]["name"], depth)
+            self.assertEqual(receipt["depth_profile"], depth)
+            self.assertTrue(all(rule in prompt["rules"] for rule in
+                                prompt["depth_profile"]["requirements"]))
+            self.assertFalse(receipt["provider_invoked"])
+        result=run("research-composer.py", "prepare", "--packet", self.packet,
+                   "--registry", self.registry, "--out", self.root/"invalid",
+                   "--depth", "ultra")
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_default_depth_is_standard(self):
+        result=self.prepare()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt=json.loads((self.bundle/"composition-receipt.json").read_text())
+        self.assertEqual(receipt["depth_profile"], "standard")
+
     def test_valid_candidate_is_only_machine_checked(self):
         p=self.validate()
         self.assertEqual(p.returncode,0,p.stderr)
