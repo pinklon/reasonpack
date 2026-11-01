@@ -50,6 +50,15 @@ doctor(){
 inspect(){ local url="$1"; validate_url "$url" >/dev/null; need yt-dlp; yt-dlp --dump-single-json --skip-download --no-playlist "$url"; }
 transcribe_fallback(){
   local audio="$1" out="$2" status="$3"
+  if [[ -z "${WHISPER_CLI:-}" ]] && command -v whisper-cli >/dev/null 2>&1; then
+    WHISPER_CLI="$(command -v whisper-cli)"
+  fi
+  if [[ -z "${WHISPER_MODEL:-}" ]]; then
+    local candidate
+    for candidate in "$HOME/Models/whisper/ggml-medium.en.bin" "$HOME/Models/whisper/ggml-base.en.bin" "$HOME/Models/whisper/ggml-large-v3.bin"; do
+      if [[ -f "$candidate" ]]; then WHISPER_MODEL="$candidate"; break; fi
+    done
+  fi
   if [[ -z "${WHISPER_CLI:-}" || -z "${WHISPER_MODEL:-}" ]]; then
     python3 - "$status" <<'PY'
 import json,sys
@@ -70,9 +79,11 @@ PY
 build(){
   local url="$1" out="$2"; validate_url "$url" >/dev/null; for x in yt-dlp ffmpeg ffprobe python3; do need "$x"; done
   mkdir -p "$out"; out="$(cd "$out" && pwd)"
+  local src=""
+  if [[ "${REASONPACK_RESUME:-0}" != 1 ]]; then
   yt-dlp --dump-single-json --skip-download --no-playlist "$url" > "$out/source.json"
   yt-dlp --no-playlist -f 'bv*+ba/b' -o "$out/source.%(ext)s" "$url"
-  local src; src="$(find "$out" -maxdepth 1 -type f -name 'source.*' ! -name 'source.json' | head -n1)"; [[ -n "$src" && -s "$src" ]] || return 30
+  src="$(find "$out" -maxdepth 1 -type f -name 'source.*' ! -name 'source.json' | head -n1)"; [[ -n "$src" && -s "$src" ]] || return 30
   local vm am; read -r vm am <<<"$(python3 "$MEDIA_PLANNER" "$src")"
   [[ "$vm" == copy || "$vm" == encode ]] && [[ "$am" == copy || "$am" == encode ]] || { echo 'source media plan invalid' >&2; return 32; }
   local -a vopts aopts
@@ -85,8 +96,21 @@ build(){
   fi
   ffmpeg -hide_banner -loglevel error -y -i "$out/video.mp4" -vn -c:a copy "$out/audio.m4a"
   ffprobe -v error -show_format -show_streams -of json "$out/video.mp4" > "$out/ffprobe.json"
+  else
+    for member in video.mp4 audio.m4a source.json ffprobe.json; do
+      [[ -s "$out/$member" ]] || { log "resume missing required member: $member"; return 33; }
+    done
+    src="$(find "$out" -maxdepth 1 -type f -name 'source.*' ! -name 'source.json' | head -n1 || true)"
+    log "resuming existing media without downloading or transcoding"
+  fi
   local transcript="$out/transcript.txt" status="$out/transcript-status.json"
-  yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs --sub-langs 'en.*' --sub-format vtt -o "$out/captions.%(ext)s" "$url" >/dev/null 2>&1 || true
+  if [[ -s "$transcript" && -s "$status" ]]; then
+    log "reusing existing transcript and provenance"
+  else
+    if ! yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs --sub-langs 'en.*' --sub-format vtt -o "$out/captions.%(ext)s" "$url" >/dev/null 2>"$out/captions.stderr"; then
+      log "caption acquisition failed; attempting local fallback"
+      tail -n 2 "$out/captions.stderr" >&2 || true
+    fi
   local cap; cap="$(find "$out" -maxdepth 1 -type f -name 'captions*.vtt' | head -n1 || true)"
   if [[ -n "$cap" && -s "$cap" ]]; then
     mv "$cap" "$out/captions.vtt"; cap="$out/captions.vtt"
@@ -101,6 +125,8 @@ for line in open(src,encoding='utf-8',errors='replace'):
 open(out,'w').write('\n'.join(lines)+'\n'); open(status,'w').write(json.dumps({'status':'source-captions','sourceFile':'captions.vtt'},indent=2)+'\n')
 PY
   else transcribe_fallback "$out/audio.m4a" "$transcript" "$status" || true; fi
+  fi
+  rm -f "$out/captions.stderr"
   [[ -s "$transcript" ]] || { echo "transcript unavailable; see $status" >&2; return 31; }
   rm -f "$src" "$out/transcript.wav" "$out/transcript.whisper.stderr"; find "$out" -maxdepth 1 -type f -name 'captions*.vtt' ! -name 'captions.vtt' -delete
   python3 - "$out" "$url" <<'PY'
@@ -165,6 +191,7 @@ Usage:
   reasonpack doctor
   reasonpack inspect URL
   reasonpack build URL OUT_DIR
+  reasonpack resume URL OUT_DIR
   reasonpack verify OUT_DIR
   reasonpack self-test
   reasonpack URL [OUTPUT_ROOT]
@@ -175,4 +202,4 @@ EOF
 }
 cmd="${1:-}"; [[ -n "$cmd" ]] || { usage; exit 64; }; shift || true
 case "$cmd" in
- doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
+ doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; resume) [[ $# -eq 2 ]] || exit 64; REASONPACK_RESUME=1 build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac

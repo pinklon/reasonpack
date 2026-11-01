@@ -15,7 +15,7 @@
   },
   "referenceRuntime": {
     "path": "bin/reasonpack",
-    "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506",
+    "sha256": "a5125cb1e6b9eee182418e2f4db07663a2b0d185f45129c607f9464d62f4ba48",
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
@@ -44,8 +44,8 @@
     },
     {
       "path": "bin/reasonpack",
-      "bytes": 11177,
-      "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506"
+      "bytes": 12407,
+      "sha256": "a5125cb1e6b9eee182418e2f4db07663a2b0d185f45129c607f9464d62f4ba48"
     },
     {
       "path": "bin/rp",
