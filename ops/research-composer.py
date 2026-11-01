@@ -134,7 +134,16 @@ def prepare(args):
     packet,registry,identity=inputs(args.packet,args.registry)
     if args.out.exists():refuse("composition directory already exists")
     schema_raw=(json.dumps(schema(packet.get("transcript_mode")=="segmented"),indent=2)+"\n").encode()
-    depth=mod("depth-profile").resolve(args.depth)
+    depth_name=args.depth or "standard"
+    admission_sha=None
+    if args.job:
+        admitted,admission_sha=mod("depth-admission").load(args.job)
+        if args.depth and args.depth!=admitted["depth_profile"]:
+            refuse("requested depth differs from immutable offline admission")
+        if packet.get("source_manifest_sha256")!=admitted["source_manifest_sha256"]:
+            refuse("offline admission source does not match research packet")
+        depth_name=admitted["depth_profile"]
+    depth=mod("depth-profile").resolve(depth_name)
     prompt_raw=prompt(packet,registry,identity,depth).encode("utf-8")
     if len(prompt_raw)>180_000:
         refuse("composed reasoning prompt exceeds 180 KB; segment source context")
@@ -207,6 +216,7 @@ def prepare(args):
                  "evidence_registry_sha256":identity["registry_sha256"],
                  "model_prompt_sha256":digest(prompt_raw),"model_schema_sha256":digest(schema_raw),
                  "depth_profile":depth["name"],
+                 "offline_admission_sha256":admission_sha,
                  "provider_invoked":False,"owner_approved":False,"public_release":False,
                  "transcript_mode":packet.get("transcript_mode","inline"),
                  "segment_prompt_receipts":segment_prompt_digests,
@@ -279,7 +289,8 @@ def main():
         s.add_argument("--out",type=Path,required=True)
         if cmd=="prepare":
             s.add_argument("--segments",type=Path)
-            s.add_argument("--depth",choices=("short","standard","deep","exhaustive"),default="standard")
+            s.add_argument("--depth",choices=("short","standard","deep","exhaustive"))
+            s.add_argument("--job",type=Path,help="optional immutable local depth admission")
         if cmd=="validate":
             s.add_argument("--candidate",type=Path,required=True)
             s.add_argument("--synthesis",type=Path)

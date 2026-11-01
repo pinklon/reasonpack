@@ -97,6 +97,47 @@ class CompositionTests(unittest.TestCase):
         receipt=json.loads((self.bundle/"composition-receipt.json").read_text())
         self.assertEqual(receipt["depth_profile"], "standard")
 
+    def test_offline_depth_admission_pins_retries_and_composition(self):
+        job=self.root/"offline-job"
+        manifest=ROOT/"examples/sample-reasonpack/manifest.json"
+        created=run("depth-admission.py","init","--job",job,"--manifest",manifest,"--depth","deep")
+        self.assertEqual(created.returncode,0,created.stderr)
+        self.assertEqual(run("depth-admission.py","init","--job",job,"--manifest",manifest,"--depth","deep").returncode,0)
+        changed=run("depth-admission.py","init","--job",job,"--manifest",manifest,"--depth","short")
+        self.assertEqual(changed.returncode,2)
+        self.assertIn("changed source or depth",changed.stderr)
+        composed=run("research-composer.py","prepare","--packet",self.packet,"--registry",self.registry,
+                     "--out",self.bundle,"--job",job)
+        self.assertEqual(composed.returncode,0,composed.stderr)
+        receipt=json.loads((self.bundle/"composition-receipt.json").read_text())
+        check=run("depth-admission.py","check","--job",job,"--depth","deep")
+        self.assertEqual(check.returncode,0,check.stderr)
+        self.assertEqual(receipt["offline_admission_sha256"],json.loads(check.stdout)["admission_sha256"])
+        self.assertEqual(receipt["depth_profile"],"deep")
+        self.assertEqual(run("depth-admission.py","check","--job",job,"--depth","short").returncode,2)
+
+    def test_offline_depth_mismatch_and_source_drift_fail_closed(self):
+        job=self.root/"offline-job"
+        manifest=ROOT/"examples/sample-reasonpack/manifest.json"
+        self.assertEqual(run("depth-admission.py","init","--job",job,"--manifest",manifest,"--depth","deep").returncode,0)
+        conflict=run("research-composer.py","prepare","--packet",self.packet,"--registry",self.registry,
+                     "--out",self.bundle,"--job",job,"--depth","short")
+        self.assertEqual(conflict.returncode,2)
+        self.assertIn("differs from immutable",conflict.stderr)
+        modified=self.root/"modified-manifest.json"
+        modified.write_text('{"changed":true}')
+        self.assertEqual(run("depth-admission.py","init","--job",job,"--manifest",modified,"--depth","deep").returncode,2)
+        packet=json.loads(self.packet.read_text())
+        packet["source_manifest_sha256"]="f"*64
+        self.packet.write_text(json.dumps(packet))
+        registry=json.loads(self.registry.read_text())
+        registry["source_manifest_sha256"]="f"*64
+        self.registry.write_text(json.dumps(registry))
+        drift=run("research-composer.py","prepare","--packet",self.packet,"--registry",self.registry,
+                  "--out",self.bundle,"--job",job)
+        self.assertEqual(drift.returncode,2)
+        self.assertIn("source does not match",drift.stderr)
+
     def test_valid_candidate_is_only_machine_checked(self):
         p=self.validate()
         self.assertEqual(p.returncode,0,p.stderr)

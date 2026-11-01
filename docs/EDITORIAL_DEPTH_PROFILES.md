@@ -1,6 +1,6 @@
 # ReasonPack editorial depth profiles
 
-A depth profile controls the **analysis request**, not source acquisition, evidence quality, publication permission or automated model execution. Profiles are defined in `ops/depth-profile.py`. In this isolated source-only candidate, manual composition binds the selected profile into the generated prompt and receipt. Immutable job-state binding remains in the separate, unmerged Reader pipeline and is not claimed here.
+A depth profile controls the **analysis request**, not source acquisition, evidence quality, publication permission or automated model execution. Profiles are defined in `ops/depth-profile.py`. In this isolated source-only candidate, composition binds the selected profile into the generated prompt and receipt. A separate local write-once admission binds the source digest and profile on retries; privileged signed-email job admission remains outside this candidate.
 
 | Profile | Use when | What it requires |
 | --- | --- | --- |
@@ -11,7 +11,15 @@ A depth profile controls the **analysis request**, not source acquisition, evide
 
 Selection is **editorial judgment**. Duration alone is not sufficient. Escalate when substantial implementation detail or consequential claims deserve it. Do not impose artificial word counts, citation quotas or metadata-byte caps based on the profile. Existing safety and source-integrity bounds remain independent.
 
-For manual source-only composition, use `python3 ops/research-composer.py prepare --depth deep ...` with an already verified research input and evidence register. The selected profile is embedded in the generated model prompt and `composition-receipt.json`. `validate` checks the returned analysis against the pinned composition. No local job-admission or retry authority is provided by this command.
+For a private offline job, first verify the source pack independently with `reasonpack verify`. Then pin the selected profile and exact source manifest locally:
+
+```sh
+python3 ops/depth-admission.py init --job PRIVATE_JOB --manifest VERIFIED_PACK/manifest.json --depth deep
+python3 ops/research-composer.py prepare --job PRIVATE_JOB --packet RESEARCH_INPUT.json --registry EVIDENCE.json --out PRIVATE_COMPOSITION
+python3 ops/depth-admission.py check --job PRIVATE_JOB --depth deep
+```
+
+Reusing the same local job directory with a different profile or source-manifest digest fails. The admitted depth is embedded in the generated model prompt and `composition-receipt.json`, along with a digest of the local admission record. A manual composition without `--job` still defaults to `standard`, or takes an explicit `--depth`. This is a local write-once workflow guard, not cryptographic attestation against an administrator modifying disk contents; it does not independently verify the source pack, execute a model or authorize publication.
 
 The original stacked Reader workflow (`ops/reader-pipeline.py` in PR #31) additionally pins `depth_profile` in `workflow.json` and rejects reusing a job ID with a changed depth. That workflow is deliberately not copied into this source-only candidate because its initialization is coupled to the privileged signed-email gateway.
 
