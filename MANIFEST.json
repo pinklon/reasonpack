@@ -19,7 +19,7 @@
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
-    "documentCount": 22,
+    "documentCount": 23,
     "renderedLineCount": 3119,
     "offlineReader": "documentation.html",
     "map": "docs/DOCUMENTATION_MAP.md",
@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 3164,
-      "sha256": "72e2e59c8638ed7b38d99a64cd2a2bf4c9b6f57364b8eb3c55c47a33c30c51eb"
+      "bytes": 3323,
+      "sha256": "6cd396e95dfacbee44887724215c65b8eb58df0148b24f3f98d3e13878cdbd38"
     },
     {
       "path": "bin/reasonpack",
@@ -146,6 +146,11 @@
       "path": "docs/REQUIREMENTS_TRACEABILITY.md",
       "bytes": 5036,
       "sha256": "6f1300b1fe9de8c01637c52c74b8a360a655ec3853ec2bf06e154aec2d885114"
+    },
+    {
+      "path": "docs/RESEARCH_WORKFLOW.md",
+      "bytes": 2836,
+      "sha256": "211f391887c357971d3f83a33c7a1bdb1a1315c0b399a246abc3563fbe73d16a"
     },
     {
       "path": "docs/ROADMAP.md",
@@ -263,6 +268,11 @@
       "sha256": "67ff5e1d75fc6b4f255da97ff17a7a09bc4a434631ea4001c7775dbf00448e40"
     },
     {
+      "path": "ops/research-flow.py",
+      "bytes": 4714,
+      "sha256": "641915639fc48ade7ef0735d3ddaa90ac070ff36d0026e9b7ca4ebd3a4355815"
+    },
+    {
       "path": "presentation/reasonpack-vision-poster.png",
       "bytes": 1784552,
       "sha256": "c68ddc6049717db7c05e5ed2c2eb1b4e418191aaebf0904082315bc432729761"
@@ -271,6 +281,11 @@
       "path": "tests/test-package.sh",
       "bytes": 1774,
       "sha256": "68678d036da6d922c95965b24294364e383d913c07cabeb7874152d04ebb0f9b"
+    },
+    {
+      "path": "tests/test-research-flow.py",
+      "bytes": 4222,
+      "sha256": "302aee9683aa4155b8f0369b78928401bd89439b2696d37a9b9e3f6e1f583b15"
     }
   ],
   "notes": [
