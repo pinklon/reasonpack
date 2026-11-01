@@ -73,6 +73,21 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual((self.bundle/"model-prompt.json").stat().st_mode & 0o777,0o600)
         self.assertEqual(self.prepare().returncode,2)
 
+    def test_caption_navigation_cues_bind_to_model_context(self):
+        packet=json.loads(self.packet.read_text())
+        timeline={"caption_sha256":"a"*64,"caption_cues_total":2,
+                  "timeline_sampled":False,
+                  "navigation_cues":[{"at":"00:00:02","cue":"A quoted source cue"},
+                                     {"at":"00:01:04","cue":"Another spoken cue"}]}
+        packet["source_caption_timeline"]=timeline
+        self.packet.write_text(json.dumps(packet))
+        p=self.prepare()
+        self.assertEqual(p.returncode,0,p.stderr)
+        prompt=json.loads((self.bundle/"model-prompt.json").read_text())
+        self.assertEqual(prompt["bounded_evidence"]["source_caption_timeline"],timeline)
+        self.assertTrue(any("HH:MM:SS" in rule for rule in prompt["rules"]))
+        self.assertTrue(any("repository-only" in rule for rule in prompt["rules"]))
+
     def test_all_depth_profiles_bind_to_prompt_and_receipt(self):
         for depth in ("short", "standard", "deep", "exhaustive"):
             target=self.root / ("composition-" + depth)
