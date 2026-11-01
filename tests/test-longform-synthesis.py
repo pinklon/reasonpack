@@ -117,6 +117,18 @@ class SynthesisTests(unittest.TestCase):
                          json.loads(sealed.stdout)["coverage_sha256"])
         final_schema.write_text(final_schema.read_text()+" ")
         self.assertEqual(self.call("verify").returncode,2)
+    def test_node_schema_strict_output_compatibility(self):
+        node={"id":"level-001-node-000000"}
+        children=[{"sha256":"a"*64},{"sha256":"b"*64}]
+        contract=S.node_schema(node,"c"*64,children)
+        digest_field=contract["properties"]["child_sha256"]
+        self.assertEqual(digest_field["items"],{"type":"string"})
+        self.assertEqual(len(digest_field["prefixItems"]),2)
+        self.assertEqual(digest_field["minItems"],2)
+        self.assertEqual(digest_field["maxItems"],2)
+        self.assertEqual(digest_field["prefixItems"][0]["enum"],["a"*64])
+        self.assertEqual(digest_field["prefixItems"][1]["enum"],["b"*64])
+
     def test_missing_leaf_holds(self):
         (self.results/"segment-000007.json").unlink()
         p=self.call("init")
