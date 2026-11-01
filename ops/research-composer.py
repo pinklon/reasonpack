@@ -47,9 +47,13 @@ def inputs(packet_path,registry_path):
     ev=mod("research-evidence")
     ev.verified_register(registry_path,packet_path)
     source=packet.get("source_url")
-    if not isinstance(source,str) or urlparse(source).hostname not in ("www.youtube.com","youtube.com"):
+    parsed=urlparse(source) if isinstance(source,str) else None
+    if not parsed or parsed.scheme not in ("http","https") or parsed.hostname not in ("www.youtube.com","youtube.com","m.youtube.com","youtu.be") or parsed.username or parsed.password:
         refuse("invalid canonical source")
-    vid=parse_qs(urlparse(source).query).get("v",[""])[0]
+    if parsed.hostname=="youtu.be":
+        vid=parsed.path.lstrip("/")
+    else:
+        vid=parse_qs(parsed.query).get("v",[""])[0]
     if not re.fullmatch(r"[A-Za-z0-9_-]{11}",vid):
         refuse("invalid source video ID")
     return packet,registry,{"packet_sha256":digest(packet_raw),"registry_sha256":digest(registry_raw),"video_id":vid}

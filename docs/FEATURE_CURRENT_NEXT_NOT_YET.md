@@ -6,7 +6,7 @@ Use this page when someone needs a one-screen answer.
 
 **Source:** one allowlisted YouTube URL; metadata/media/caption acquisition; no playlists.
 
-**Transform:** H.264/AAC MP4, AAC audio, ffprobe metadata.
+**Transform:** codec-qualified stream copy when compatible, otherwise H.264/AAC encoding; AAC extraction and ffprobe metadata. Failed stream copy falls back to full encoding.
 
 **Transcript:** source captions first; optional explicitly configured local Whisper fallback; transcript status always matters.
 

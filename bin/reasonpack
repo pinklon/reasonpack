@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 VERSION="1.0-refkit.1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MEDIA_PLANNER="$SCRIPT_DIR/../ops/media-plan.py"
+[[ -f "$MEDIA_PLANNER" ]] || MEDIA_PLANNER="$SCRIPT_DIR/media-plan.py"
 DEFAULT_ROOT="${REASONPACK_ROOT:-$HOME/Desktop/Reasoning Packs}"
 log(){ printf '[reasonpack] %s\n' "$*"; }
 fail(){ printf '[reasonpack] ERROR: %s\n' "$*" >&2; exit "${2:-1}"; }
@@ -70,8 +73,17 @@ build(){
   yt-dlp --dump-single-json --skip-download --no-playlist "$url" > "$out/source.json"
   yt-dlp --no-playlist -f 'bv*+ba/b' -o "$out/source.%(ext)s" "$url"
   local src; src="$(find "$out" -maxdepth 1 -type f -name 'source.*' ! -name 'source.json' | head -n1)"; [[ -n "$src" && -s "$src" ]] || return 30
-  ffmpeg -hide_banner -loglevel error -y -i "$src" -map 0:v:0 -map 0:a:0? -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "$out/video.mp4"
-  ffmpeg -hide_banner -loglevel error -y -i "$src" -vn -c:a aac -b:a 128k "$out/audio.m4a"
+  local vm am; read -r vm am <<<"$(python3 "$MEDIA_PLANNER" "$src")"
+  [[ "$vm" == copy || "$vm" == encode ]] && [[ "$am" == copy || "$am" == encode ]] || { echo 'source media plan invalid' >&2; return 32; }
+  local -a vopts aopts
+  if [[ "$vm" == copy ]]; then vopts=(-c:v copy); else vopts=(-c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p); fi
+  if [[ "$am" == copy ]]; then aopts=(-c:a copy); else aopts=(-c:a aac -b:a 128k); fi
+  log "media normalization: video=$vm audio=$am"
+  if ! ffmpeg -hide_banner -loglevel error -y -i "$src" -map 0:v:0 -map 0:a:0 "${vopts[@]}" "${aopts[@]}" -movflags +faststart "$out/video.mp4"; then
+    log "stream-copy/qualified conversion failed; retrying standard encode"
+    ffmpeg -hide_banner -loglevel error -y -i "$src" -map 0:v:0 -map 0:a:0 -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "$out/video.mp4"
+  fi
+  ffmpeg -hide_banner -loglevel error -y -i "$out/video.mp4" -vn -c:a copy "$out/audio.m4a"
   ffprobe -v error -show_format -show_streams -of json "$out/video.mp4" > "$out/ffprobe.json"
   local transcript="$out/transcript.txt" status="$out/transcript-status.json"
   yt-dlp --skip-download --no-playlist --write-subs --write-auto-subs --sub-langs 'en.*' --sub-format vtt -o "$out/captions.%(ext)s" "$url" >/dev/null 2>&1 || true

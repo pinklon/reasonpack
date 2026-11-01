@@ -5,6 +5,7 @@ if command -v apt-get >/dev/null 2>&1; then sudo apt-get update; sudo apt-get in
 VENV="$HOME/.local/share/reasonpack/venv"; python3 -m venv "$VENV"; "$VENV/bin/python" -m pip install --upgrade pip yt-dlp
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/reasonpack"
 cp "$HERE/bin/reasonpack" "$HOME/.local/share/reasonpack/reasonpack"; chmod 755 "$HOME/.local/share/reasonpack/reasonpack"
+cp "$HERE/ops/media-plan.py" "$HOME/.local/share/reasonpack/media-plan.py"
 for n in reasonpack yt rp; do ln -sf "$HOME/.local/share/reasonpack/reasonpack" "$HOME/.local/bin/$n"; done
 ln -sf "$VENV/bin/yt-dlp" "$HOME/.local/bin/yt-dlp"
 PROFILE="$HOME/.bashrc"; [[ "${SHELL:-}" == */zsh ]] && PROFILE="$HOME/.zshrc"; touch "$PROFILE"

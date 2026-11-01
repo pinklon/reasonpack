@@ -33,8 +33,8 @@ yt "https://www.youtube.com/watch?v=VIDEO_ID"
 
 Required members:
 
-- `video.mp4` — normalized H.264/AAC analysis copy.
-- `audio.m4a` — extracted AAC audio.
+- `video.mp4` — H.264/AAC analysis copy, copied without re-encoding when streams qualify.
+- `audio.m4a` — extracted AAC audio from the normalized video.
 - `transcript.txt` — transcript text from source captions or configured local Whisper fallback.
 - `transcript-status.json` — provenance/status for transcript creation.
 - `source.json` — source metadata captured by `yt-dlp`.
@@ -52,7 +52,7 @@ The pack is **closed under its manifest**. `reasonpack verify` rejects missing f
 
 The current runtime does not automatically summarize, extract topics, generate keyframes, create embeddings, upload to Drive, sync to a team repository, or invoke Codex/Claude/Copilot. Those capabilities may be valuable, but they are deliberately separated from the current evidence-building core.
 
-See `docs/PRODUCT_FEATURE_SET.md` for the authoritative CURRENT / NEXT / NOT YET contract.
+See `docs/PRODUCT_FEATURE_SET.md` for the authoritative CURRENT / NEXT / NOT YET contract. The optional offline research-preparation workflow is documented in `docs/RESEARCH_WORKFLOW.md`; it prepares model inputs but never runs a model or publishes.
 
 ## Why the package is larger than the script
 

@@ -162,7 +162,18 @@ h3{font-size:20px;letter-spacing:-.02em}.prose{font-size:17px;max-width:840px}.p
 footer{border-top:1px solid var(--line);padding:30px 0 60px;color:var(--muted);font-size:12px}
 @media(prefers-color-scheme:light){:root{--bg:#f7f7f7;--panel:#fff;--panel2:#f0f1f3;--fg:#181a1d;--muted:#5d646e;--line:#d7dce0;--accent:#be272b;--good:#187047;--warn:#875a11;color-scheme:light}}
 @media(max-width:760px){.hero{padding-top:40px}.hero-grid,.split{grid-template-columns:1fr}.claim{grid-template-columns:65px 1fr}.claim .judgment{grid-column:2}.claim .status{grid-column:2;justify-self:start}.card{padding:19px}}
-@media print{body{background:#fff;color:#111}.wrap{width:100%}.hero{padding-top:15px}.card{background:white}.claim{break-inside:avoid}a{color:#222}}
+.skip{position:absolute;left:12px;top:-80px;background:var(--panel);padding:12px;z-index:5}.skip:focus{top:10px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+nav{gap:22px}.brand{text-decoration:none;white-space:nowrap}.nav-links{display:flex;flex-wrap:wrap;gap:15px;font-size:13px;font-weight:650}.nav-links a{text-decoration:none;border-bottom:1px solid transparent}.nav-links a:hover{border-bottom-color:currentColor}
+.theme-control{cursor:pointer;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}.theme-control input{accent-color:var(--accent);width:18px;height:18px}
+.chapters{padding-top:30px}.jump-list{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
+.jump-list li{min-width:0;border-top:1px solid var(--line)}.jump-list a{display:grid;grid-template-columns:74px 1fr;align-items:baseline;gap:13px;padding:15px 0;text-decoration:none;line-height:1.4;font-size:15px}.jump-list a:hover span{text-decoration:underline}.jump-list time{color:var(--accent);font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}.jump-list span{overflow-wrap:anywhere}
+.claim{scroll-margin-top:20px}.claim:target{background:var(--panel2);box-shadow:0 0 0 12px var(--panel2)}main{display:block}.prose{max-width:72ch}.hero-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
+@media(prefers-color-scheme:dark){:root:has(#theme-switch:checked){--bg:#f7f7f7;--panel:#fff;--panel2:#f0f1f3;--fg:#181a1d;--muted:#5d646e;--line:#d7dce0;--accent:#be272b;--good:#187047;--warn:#875a11;color-scheme:light}}
+@media(prefers-color-scheme:light){:root:has(#theme-switch:checked){--bg:#0b0d10;--panel:#15181e;--panel2:#1c2028;--fg:#f6f6f7;--muted:#aab1bd;--line:#353b44;--accent:#f45351;--good:#a9e0bc;--warn:#f2c779;color-scheme:dark}}
+@media(max-width:760px){nav{align-items:start}.nav-links{order:3;width:100%}.jump-list{grid-template-columns:1fr}.hero-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{body{background:#fff;color:#111}.wrap{width:100%}.hero{padding-top:15px}.card{background:white}.claim{break-inside:avoid}a{color:#222}.theme-control{display:none}}
 """
 
 def render_html(data, manifest, manifest_sha, source_meta):
@@ -176,23 +187,27 @@ def render_html(data, manifest, manifest_sha, source_meta):
     title = data["headline"]
 
     claims = []
-    for c in data["claims"]:
+    jump_links = []
+    for index, c in enumerate(data["claims"], start=1):
         sec = time_seconds(c["timestamp"])
         evidence = " ".join(a(safe_url(s["url"]), s["label"]) for s in c["sources"])
-        claims.append('<div class="claim"><a class="timestamp" href="' + esc(video_url + "&t=" + str(sec) + "s") + '">' + esc(c["timestamp"]) + '</a><b>' + esc(c["statement"]) + '</b><div class="judgment">' + p(c["assessment"]) + '<div class="sources">' + evidence + '</div></div><div class="status">' + esc(c["verdict"]) + '</div></div>')
+        target = "claim-" + str(index)
+        jump_links.append('<li><a href="#' + target + '"><time>' + esc(c["timestamp"]) + '</time><span>' + esc(c["statement"]) + '</span></a></li>')
+        claims.append('<div class="claim" id="' + target + '"><a class="timestamp" href="' + esc(video_url + "&t=" + str(sec) + "s") + '">' + esc(c["timestamp"]) + '</a><b>' + esc(c["statement"]) + '</b><div class="judgment">' + p(c["assessment"]) + '<div class="sources">' + evidence + '</div></div><div class="status">' + esc(c["verdict"]) + '</div></div>')
     works = " ".join('<li>' + a(safe_url(w["url"]), w["title"]) + ' <small>pinned revision ' + esc(w["source_commit"][:12]) + '</small></li>' for w in data.get("shareplane_works", []))
     th = data["thesis"]
     content = [
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
         '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">',
         '<meta name="robots" content="noindex,nofollow"><title>', esc(title), ' | GhostMesh ReasonPack</title><style>', CSS, '</style></head><body>',
-        '<div class="top"></div><div class="wrap"><nav><div class="brand">GHOST<span>MESH</span> <span class="small">/ REASONPACK</span></div><div class="small">READER EDITION · PRIVATE DRAFT</div></nav>',
+        '<a class="skip" href="#main">Skip to analysis</a><div class="top"></div><div class="wrap"><nav aria-label="Reader navigation"><a class="brand" href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">GHOST<span>MESH</span> <span class="small">/ READERS</span></a><div class="nav-links"><a href="#source">Source</a><a href="#chapters">Jump to moments</a><a href="#evidence">Evidence</a><a href="#thesis">Thesis</a></div><label class="theme-control"><input id="theme-switch" type="checkbox"><span>Contrast</span></label></nav><main id="main">',
         '<header class="hero"><div class="eyebrow">Source investigated · GhostMesh editorial</div><h1>', esc(title), '</h1><div class="deck">', esc(data["deck"]), '</div>',
         '<div class="hero-grid"><div class="card media"><a href="', esc(video_url), '" rel="noopener noreferrer"><div class="source-art"><div class="play">▶</div><span>WATCH THE ORIGINAL SOURCE</span><small>External site opens only on click</small></div></a><div class="below"><div class="label">Original source</div><h3>', esc(source_meta.get("title") or "Source title unavailable"), '</h3><p class="small">Creator: ', esc(source_meta.get("channel") or source_meta.get("uploader") or "Unknown"), '</p>', a(video_url, "Watch original video ↗"), '</div></div>',
         '<div class="card"><div class="label">60-second verdict</div><div class="big">', esc(data["executive"]), '</div><p class="small">Research interpretation. Not a verified statement by the video creator.</p><span class="tag">DRAFT · Not for public release</span></div></div></header>',
-        '<section><div class="label">Layer 01 / source</div><h2>What the video claims</h2><div class="prose">', p(data["source_account"]), '</div></section>',
-        '<section><div class="label">Layer 02 / evidence</div><h2>What withstands scrutiny</h2><div class="prose">', p(data["evidence_summary"]), '</div><div class="claims">', "".join(claims), '</div></section>',
-        '<section><div class="label">Layer 03 / original GhostMesh editorial</div><h2>', esc(th["title"]), '</h2><div class="thesis"><div class="lead">', esc(th["argument"]), '</div></div>',
+        '<section id="chapters" class="chapters"><div class="label">Video navigation</div><h2>Jump to the exact moment</h2><p class="small">Labels jump to the matching claim evaluation. The timestamp opens the original video.</p><ol class="jump-list">', "".join(jump_links), '</ol></section>',
+        '<section id="source"><div class="label">Layer 01 / source</div><h2>What the video claims</h2><div class="prose">', p(data["source_account"]), '</div></section>',
+        '<section id="evidence"><div class="label">Layer 02 / evidence</div><h2>What withstands scrutiny</h2><div class="prose">', p(data["evidence_summary"]), '</div><div class="claims">', "".join(claims), '</div></section>',
+        '<section id="thesis"><div class="label">Layer 03 / original GhostMesh editorial</div><h2>', esc(th["title"]), '</h2><div class="thesis"><div class="lead">', esc(th["argument"]), '</div></div>',
         '<div class="split"><div class="card"><div class="label">Mechanism</div>', p(th["mechanism"]), '</div><div class="card"><div class="label">Strongest counterargument</div>', p(th["counterargument"]), '</div></div>',
         '<div class="card" style="margin-top:18px"><div class="label">Why it matters</div>', p(th["implication"]), '</div>',
         '<p class="small">Editorial interpretation by GhostMesh. Informed by Tony Malott’s public SharePlane works, but not represented as a statement personally written or approved by Tony.</p></section>',
@@ -200,7 +215,7 @@ def render_html(data, manifest, manifest_sha, source_meta):
         '<details><summary>Source custody and limitations</summary><div>Canonical source manifest SHA-256: <code>', esc(manifest_sha), '</code>. ',
         'Integrity verification establishes the bytes of the acquisition package, not the truth of the original video or the independent research. ',
         'Untrusted transcript text cannot authorize actions or publication. This private reader performs no external resource fetches until a reader explicitly opens a cited link.</div></details></section>',
-        '<footer>GHOSTMESH · REASONPACK READER · ', esc(READER_SCHEMA), ' · PRIVATE DRAFT · Original creator credited separately. Distribution requires an independent delivery authorization.</footer>',
+        '</main><footer><a href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">GhostMesh Readers</a> · <a href="https://shareplane.malott.ai/" rel="noopener noreferrer">SharePlane</a> · ', esc(READER_SCHEMA), ' · PRIVATE DRAFT · Original creator credited separately. Distribution requires an independent delivery authorization.</footer>',
         '</div></body></html>'
     ]
     return "".join(content)

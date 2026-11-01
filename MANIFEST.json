@@ -15,11 +15,11 @@
   },
   "referenceRuntime": {
     "path": "bin/reasonpack",
-    "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef",
+    "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506",
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
-    "documentCount": 22,
+    "documentCount": 23,
     "renderedLineCount": 3119,
     "offlineReader": "documentation.html",
     "map": "docs/DOCUMENTATION_MAP.md",
@@ -39,13 +39,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 3164,
-      "sha256": "72e2e59c8638ed7b38d99a64cd2a2bf4c9b6f57364b8eb3c55c47a33c30c51eb"
+      "bytes": 3387,
+      "sha256": "980bfbad1134020dcf2aefd7fe507339986ccf8b6b7659befee3685b682ab7cf"
     },
     {
       "path": "bin/reasonpack",
-      "bytes": 10279,
-      "sha256": "3fb0e0b7b4eb0977671b12de9b28d9a41fa6f539a2b0ba6e426f6643238b6fef"
+      "bytes": 11177,
+      "sha256": "450503ae40a03722b68b8679a45c2bd9357e9fc92416591d265e3153c14d2506"
     },
     {
       "path": "bin/rp",
@@ -114,8 +114,8 @@
     },
     {
       "path": "docs/FEATURE_CURRENT_NEXT_NOT_YET.md",
-      "bytes": 1233,
-      "sha256": "f7e97545fef0f2404aa6db3a9ba892568e1b13c20f8081e370a313800dd1a3ec"
+      "bytes": 1349,
+      "sha256": "0f98b8069368f03bd3a4128dece9bf803d85df8d15b157d8456c0cf50cc341df"
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -139,13 +139,18 @@
     },
     {
       "path": "docs/PRODUCT_FEATURE_SET.md",
-      "bytes": 7978,
-      "sha256": "50bb160dd13e46560914b882a413f5d54a069420e217d34682b2eebe20edcefc"
+      "bytes": 8228,
+      "sha256": "0fb016202dbbd3ce4854d09c4fd2f78610b68b2b241dc5fbc7189909c9c97523"
     },
     {
       "path": "docs/REQUIREMENTS_TRACEABILITY.md",
       "bytes": 5036,
       "sha256": "6f1300b1fe9de8c01637c52c74b8a360a655ec3853ec2bf06e154aec2d885114"
+    },
+    {
+      "path": "docs/RESEARCH_WORKFLOW.md",
+      "bytes": 2836,
+      "sha256": "211f391887c357971d3f83a33c7a1bdb1a1315c0b399a246abc3563fbe73d16a"
     },
     {
       "path": "docs/ROADMAP.md",
@@ -244,13 +249,13 @@
     },
     {
       "path": "install/install-linux.sh",
-      "bytes": 1483,
-      "sha256": "5861a27761e72ce1725d7d0f062585681469a0b9f56c2828f06cfa6e662e559b"
+      "bytes": 1558,
+      "sha256": "ab1e71cb8907b678453949f221f2e5eb6bda41b0625063119b64ea10a4394d9c"
     },
     {
       "path": "install/install-macos.sh",
-      "bytes": 956,
-      "sha256": "86559addeedb3eb1fe6cc4397056fc98bb32cc4b6316e0e45967693bf968b5f9"
+      "bytes": 1031,
+      "sha256": "66186c1268cfd6baadfbbdc0a37d4eff09643a5d1d7a0e752cfca88769a40fbf"
     },
     {
       "path": "install/install-windows-wsl.ps1",
@@ -263,14 +268,34 @@
       "sha256": "67ff5e1d75fc6b4f255da97ff17a7a09bc4a434631ea4001c7775dbf00448e40"
     },
     {
+      "path": "ops/media-plan.py",
+      "bytes": 1273,
+      "sha256": "205a150a19bebddad6d40d3fed7fd4a5f36e666378a08b6b57fa4d6830ec45b7"
+    },
+    {
+      "path": "ops/research-flow.py",
+      "bytes": 4714,
+      "sha256": "641915639fc48ade7ef0735d3ddaa90ac070ff36d0026e9b7ca4ebd3a4355815"
+    },
+    {
       "path": "presentation/reasonpack-vision-poster.png",
       "bytes": 1784552,
       "sha256": "c68ddc6049717db7c05e5ed2c2eb1b4e418191aaebf0904082315bc432729761"
     },
     {
+      "path": "tests/test-media-plan.py",
+      "bytes": 1355,
+      "sha256": "bb3b606fa7680583b81564d18a2eba8729691cec2bf90e96544885170c8d3164"
+    },
+    {
       "path": "tests/test-package.sh",
       "bytes": 1774,
       "sha256": "68678d036da6d922c95965b24294364e383d913c07cabeb7874152d04ebb0f9b"
+    },
+    {
+      "path": "tests/test-research-flow.py",
+      "bytes": 4222,
+      "sha256": "302aee9683aa4155b8f0369b78928401bd89439b2696d37a9b9e3f6e1f583b15"
     }
   ],
   "notes": [
