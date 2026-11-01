@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 3228,
-      "sha256": "e88da8c3d512109cc4798bbe52a5e07114dff0460334bf905a676edb0fd67b6e"
+      "bytes": 3387,
+      "sha256": "980bfbad1134020dcf2aefd7fe507339986ccf8b6b7659befee3685b682ab7cf"
     },
     {
       "path": "bin/reasonpack",
@@ -271,6 +271,11 @@
       "path": "ops/media-plan.py",
       "bytes": 1273,
       "sha256": "205a150a19bebddad6d40d3fed7fd4a5f36e666378a08b6b57fa4d6830ec45b7"
+    },
+    {
+      "path": "ops/research-flow.py",
+      "bytes": 4714,
+      "sha256": "641915639fc48ade7ef0735d3ddaa90ac070ff36d0026e9b7ca4ebd3a4355815"
     },
     {
       "path": "presentation/reasonpack-vision-poster.png",
