@@ -35,7 +35,9 @@ def vtt_seconds(value):
     return int(hour)*3600+int(minute)*60+float(sec)
 MEMBERS=("video.mp4","audio.m4a","transcript.txt","transcript-status.json",
          "source.json","ffprobe.json","captions.vtt")
-MAX_SOURCE_JSON=8_000_000
+# yt-dlp can include multi-language caption/format catalogs exceeding 8 MB.
+# Preserve the complete metadata as provenance, with a generous finite safety ceiling.
+MAX_SOURCE_JSON=32 * 1024 * 1024
 MAX_VTT_BYTES=40_000_000
 
 def hold(msg):raise ValueError(msg)
