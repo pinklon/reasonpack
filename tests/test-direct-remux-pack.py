@@ -97,7 +97,7 @@ class DirectPackTests(unittest.TestCase):
         self.assertLess((target/"source.json").stat().st_size,M.MAX_SOURCE_JSON)
         self.assertEqual(json.loads((target/"source.json").read_text())["id"],
                          "jEOUUAPC1sc")
-        self.assertTrue((target/"checksums.sha256").is_file())
+        self.assertTrue((target/"SHA256SUMS.txt").is_file())
 
     def test_metadata_safety_ceiling_still_fails_before_media_download(self):
         from unittest.mock import patch
