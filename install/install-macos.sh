@@ -5,6 +5,8 @@ command -v brew >/dev/null 2>&1 || { echo "Homebrew is required: https://brew.sh
 for pkg in yt-dlp ffmpeg python; do brew list --versions "$pkg" >/dev/null 2>&1 || brew install "$pkg"; done
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/reasonpack"
 cp "$HERE/bin/reasonpack" "$HOME/.local/share/reasonpack/reasonpack"; chmod 755 "$HOME/.local/share/reasonpack/reasonpack"
+cp "$HERE/ops/direct-remux-pack.py" "$HOME/.local/share/reasonpack/direct-remux-pack.py"
+chmod 644 "$HOME/.local/share/reasonpack/direct-remux-pack.py"
 for n in reasonpack yt rp; do ln -sf "$HOME/.local/share/reasonpack/reasonpack" "$HOME/.local/bin/$n"; done
 PROFILE="$HOME/.zshrc"; touch "$PROFILE"
 grep -q "REASONPACK REF KIT" "$PROFILE" || printf '

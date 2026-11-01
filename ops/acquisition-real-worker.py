@@ -21,7 +21,7 @@ import time
 
 REPO=Path(__file__).resolve().parents[1]
 CLI=REPO/"bin/reasonpack"
-PIN="2b9773f76223f4f7fe37b222c8b16639f41c4a692c350794338263ef25a214b1"
+PIN="02200ef7af3c607f7b74f642a3d6d35637b431ca98a943344ffd044517b2bd78"
 SCHEMA="ghostmesh.reasonpack.acquisition-real-backend.v1"
 
 def deny(s):raise ValueError(s)
