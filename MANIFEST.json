@@ -19,7 +19,7 @@
     "relationship": "derived reference distribution; adds portable SHA fallback and quick URL/alias UX without claiming canonical upstream identity"
   },
   "documentation": {
-    "documentCount": 22,
+    "documentCount": 23,
     "renderedLineCount": 3119,
     "offlineReader": "documentation.html",
     "map": "docs/DOCUMENTATION_MAP.md",
@@ -146,6 +146,11 @@
       "path": "docs/REQUIREMENTS_TRACEABILITY.md",
       "bytes": 5036,
       "sha256": "6f1300b1fe9de8c01637c52c74b8a360a655ec3853ec2bf06e154aec2d885114"
+    },
+    {
+      "path": "docs/RESEARCH_WORKFLOW.md",
+      "bytes": 2836,
+      "sha256": "211f391887c357971d3f83a33c7a1bdb1a1315c0b399a246abc3563fbe73d16a"
     },
     {
       "path": "docs/ROADMAP.md",
@@ -281,6 +286,11 @@
       "path": "tests/test-package.sh",
       "bytes": 1774,
       "sha256": "68678d036da6d922c95965b24294364e383d913c07cabeb7874152d04ebb0f9b"
+    },
+    {
+      "path": "tests/test-research-flow.py",
+      "bytes": 4222,
+      "sha256": "302aee9683aa4155b8f0369b78928401bd89439b2696d37a9b9e3f6e1f583b15"
     }
   ],
   "notes": [
