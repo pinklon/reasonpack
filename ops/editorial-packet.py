@@ -86,6 +86,13 @@ def main():
             # exact input whose digest is recorded above.
             inline_transcript=transcript_path.read_bytes().decode("utf-8")
             segment_ref={"transcript_mode":"inline","segment_count":1}
+        caption_ref={}
+        caption_path=args.pack/"captions.vtt"
+        if caption_path.exists():
+            spec=importlib.util.spec_from_file_location("reasonpack_caption_timeline",repo/"ops/caption-timeline.py")
+            capmod=importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(capmod)
+            caption_ref={"source_caption_timeline":capmod.from_vtt(caption_path)}
         approved_dir=(repo/"editorial/approved-works").resolve()
         approved_paths=sorted(approved_dir.glob("*.json"))
         chosen=args.work if args.work else approved_paths
@@ -122,6 +129,7 @@ def main():
                       json.loads((args.pack/"transcript-status.json").read_text()),
                 "untrusted_transcript":inline_transcript,
                 **segment_ref,
+                **caption_ref,
                 "public_owner_reviewed_thesis_context":works,
                 "bounded_instructions":MODEL_INSTRUCTIONS,
                 "publication_authority":False,"email_dispatch_authority":False,
