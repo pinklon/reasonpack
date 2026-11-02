@@ -2,3 +2,5 @@
 *.part
 *.tmp
 packs/
+__pycache__/
+*.pyc
