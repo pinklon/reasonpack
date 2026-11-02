@@ -176,7 +176,86 @@ nav{gap:22px}.brand{text-decoration:none;white-space:nowrap}.nav-links{display:f
 @media print{body{background:#fff;color:#111}.wrap{width:100%}.hero{padding-top:15px}.card{background:white}.claim{break-inside:avoid}a{color:#222}.theme-control{display:none}}
 """
 
-def render_html(data, manifest, manifest_sha, source_meta):
+EVIDENCE_CSS = r"""
+.reader-banner{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 0}
+.reader-banner .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.reader-banner strong{font-size:12px;letter-spacing:.16em;color:var(--accent)}
+.reader-banner a{font-size:12px}
+.reader-search,.corroboration{margin:28px 0 44px;padding:28px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.reader-search h2,.corroboration h2{margin-top:8px}
+.reader-search label{display:block;margin:12px 0 8px;font-size:13px;color:var(--muted)}
+.reader-search input{flex:1;min-width:0;background:var(--bg);color:var(--fg);font:inherit;border:1px solid var(--line);border-radius:8px;padding:13px}
+.reader-search button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:0 14px;cursor:pointer}
+.search-row{display:flex;gap:8px}
+.search-scope{border-top:1px solid var(--line);margin-top:22px;padding-top:14px}
+.relation-list{list-style:none;margin:18px 0 0;padding:0}
+.relation{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;border-top:1px solid var(--line);padding:18px 0}
+.relation-links{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.relation-links a{border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px}
+.claim-hidden{display:none!important}
+@media(max-width:650px){.reader-search,.corroboration{padding:18px}.relation{grid-template-columns:1fr}}
+"""
+EVIDENCE_SCRIPT = r"""<script>
+(() => {
+  const field=document.getElementById('claim-search');
+  if(!field) return;
+  const clear=document.getElementById('claim-search-clear');
+  const status=document.getElementById('claim-search-count');
+  const claims=Array.from(document.querySelectorAll('.claim'));
+  const chapters=Array.from(document.querySelectorAll('.jump-list li'));
+  function update(){
+    const query=field.value.trim().toLocaleLowerCase();
+    let count=0;
+    claims.forEach((node,index)=>{
+      const match=!query||node.textContent.toLocaleLowerCase().includes(query);
+      node.classList.toggle('claim-hidden',!match);
+      if(chapters[index]) chapters[index].classList.toggle('claim-hidden',!match);
+      if(match) count++;
+    });
+    status.textContent=query ? count+' of '+claims.length+' claims match' : 'Showing all '+claims.length+' claims';
+  }
+  field.addEventListener('input',update);
+  clear.addEventListener('click',()=>{field.value='';update();field.focus();});
+  update();
+})();
+</script>"""
+
+def render_html(data, manifest, manifest_sha, source_meta, variant="classic"):
+    if variant not in ("classic", "evidence-led"):
+        fail("unknown Reader variant")
+    evidence_led = variant == "evidence-led"
+    relations = {}
+    if evidence_led:
+        for index, claim in enumerate(data["claims"], 1):
+            for src in claim["sources"]:
+                key = (safe_url(src["url"]), clean(src["label"], 180))
+                relations.setdefault(key, []).append(index)
+    relation_items = []
+    for (url, label), indexes in relations.items():
+        links = " ".join('<a href="#claim-' + str(i) + '">C' + str(i).zfill(2) + '</a>' for i in indexes)
+        relation_items.append('<li class="relation"><div>' + a(url, label) +
+                              '<p class="small">Registered evidence · ' + str(len(indexes)) +
+                              ' claim links</p></div><div class="relation-links">' + links + '</div></li>')
+    relation_html = ('<section id="corroboration" class="corroboration"><div class="label">Evidence relationships</div>'
+                     '<h2>What corroborates what</h2><p class="small">Relationships come only from claim citations.'
+                     ' A linked claim may be partially supported. No SharePlane Work relationship is inferred.</p>'
+                     '<ul class="relation-list">' + ("".join(relation_items) or '<li>No registered evidence links.</li>') + '</ul></section>') if evidence_led else ""
+    search_html = ('<section id="reader-search" class="reader-search"><div class="label">Explore the evidence</div>'
+                   '<h2>Search this investigation</h2><label for="claim-search">Search claim text and assessments</label>'
+                   '<div class="search-row"><input id="claim-search" type="search" autocomplete="off"'
+                   ' placeholder="Heretic, security, DeepSeek" /><button id="claim-search-clear" type="button">Clear</button></div>'
+                   '<p id="claim-search-count" class="small" role="status" aria-live="polite">Showing all ' +
+                   str(len(data["claims"])) + ' claims</p>'
+                   '<div class="search-scope"><form action="https://youtube.shareplane.malott.ai/readers/" method="get" target="_blank">'
+                   '<label for="public-reader-query">Search published Readers separately</label>'
+                   '<div class="search-row"><input id="public-reader-query" name="q" type="search" required'
+                   ' placeholder="Search published Readers" /><button type="submit">Search Readers</button></div></form>'
+                   '<p class="small"><a href="https://shareplane.malott.ai/" target="_blank" rel="noopener noreferrer">Explore SharePlane Works</a>.'
+                   ' The public collections maintain separate indexes; this private draft is not in either.</p></div></section>') if evidence_led else ""
+    banner_top = ('<div class="reader-banner"><div class="wrap"><strong>GHOSTMESH / EVIDENCE-LED READER</strong>'
+                  '<a href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">Reader archive</a></div></div>') if evidence_led else ""
+    banner_bottom = ('<div class="reader-banner"><div class="wrap"><strong>END OF INVESTIGATION / PRIVATE DRAFT</strong>'
+                     '<a href="https://shareplane.malott.ai/" rel="noopener noreferrer">Explore SharePlane</a></div></div>') if evidence_led else ""
     source_url = manifest.get("sourceUrl") or ""
     fixture = bool(manifest.get("fixture"))
     if fixture:
@@ -198,16 +277,16 @@ def render_html(data, manifest, manifest_sha, source_meta):
     th = data["thesis"]
     content = [
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
-        '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">',
-        '<meta name="robots" content="noindex,nofollow"><title>', esc(title), ' | GhostMesh ReasonPack</title><style>', CSS, '</style></head><body>',
-        '<a class="skip" href="#main">Skip to analysis</a><div class="top"></div><div class="wrap"><nav aria-label="Reader navigation"><a class="brand" href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">GHOST<span>MESH</span> <span class="small">/ READERS</span></a><div class="nav-links"><a href="#source">Source</a><a href="#chapters">Jump to moments</a><a href="#evidence">Evidence</a><a href="#thesis">Thesis</a></div><label class="theme-control"><input id="theme-switch" type="checkbox"><span>Contrast</span></label></nav><main id="main">',
+        '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; ' + ('script-src &#39;unsafe-inline&#39;; form-action https://youtube.shareplane.malott.ai; ' if evidence_led else 'form-action &#39;none&#39;; ') + 'img-src &#39;none&#39;; base-uri &#39;none&#39;">',
+        '<meta name="robots" content="noindex,nofollow"><title>', esc(title), ' | GhostMesh ReasonPack</title><style>', CSS, EVIDENCE_CSS if evidence_led else '', '</style></head><body>',
+        '<a class="skip" href="#main">Skip to analysis</a><div class="top"></div>', banner_top, '<div class="wrap"><nav aria-label="Reader navigation"><a class="brand" href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">GHOST<span>MESH</span> <span class="small">/ READERS</span></a><div class="nav-links"><a href="#source">Source</a><a href="#chapters">Jump to moments</a><a href="#evidence">Evidence</a><a href="#thesis">Thesis</a></div><label class="theme-control"><input id="theme-switch" type="checkbox"><span>Contrast</span></label></nav><main id="main">',
         '<header class="hero"><div class="eyebrow">Source investigated · GhostMesh editorial</div><h1>', esc(title), '</h1><div class="deck">', esc(data["deck"]), '</div>',
         '<div class="hero-grid"><div class="card media"><a href="', esc(video_url), '" rel="noopener noreferrer"><div class="source-art"><div class="play">▶</div><span>WATCH THE ORIGINAL SOURCE</span><small>External site opens only on click</small></div></a><div class="below"><div class="label">Original source</div><h3>', esc(source_meta.get("title") or "Source title unavailable"), '</h3><p class="small">Creator: ', esc(source_meta.get("channel") or source_meta.get("uploader") or "Unknown"), '</p>', a(video_url, "Watch original video ↗"), '</div></div>',
         '<div class="card"><div class="label">60-second verdict</div><div class="big">', esc(data["executive"]), '</div><p class="small">Research interpretation. Not a verified statement by the video creator.</p><span class="tag">DRAFT · Not for public release</span></div></div></header>',
-        '<section id="chapters" class="chapters"><div class="label">Video navigation</div><h2>Jump to the exact moment</h2><p class="small">Labels jump to the matching claim evaluation. The timestamp opens the original video.</p><ol class="jump-list">', "".join(jump_links), '</ol></section>',
+        search_html, '<section id="chapters" class="chapters"><div class="label">Video navigation</div><h2>Jump to the exact moment</h2><p class="small">Labels jump to the matching claim evaluation. The timestamp opens the original video.</p><ol class="jump-list">', "".join(jump_links), '</ol></section>',
         '<section id="source"><div class="label">Layer 01 / source</div><h2>What the video claims</h2><div class="prose">', p(data["source_account"]), '</div></section>',
         '<section id="evidence"><div class="label">Layer 02 / evidence</div><h2>What withstands scrutiny</h2><div class="prose">', p(data["evidence_summary"]), '</div><div class="claims">', "".join(claims), '</div></section>',
-        '<section id="thesis"><div class="label">Layer 03 / original GhostMesh editorial</div><h2>', esc(th["title"]), '</h2><div class="thesis"><div class="lead">', esc(th["argument"]), '</div></div>',
+        relation_html, '<section id="thesis"><div class="label">Layer 03 / original GhostMesh editorial</div><h2>', esc(th["title"]), '</h2><div class="thesis"><div class="lead">', esc(th["argument"]), '</div></div>',
         '<div class="split"><div class="card"><div class="label">Mechanism</div>', p(th["mechanism"]), '</div><div class="card"><div class="label">Strongest counterargument</div>', p(th["counterargument"]), '</div></div>',
         '<div class="card" style="margin-top:18px"><div class="label">Why it matters</div>', p(th["implication"]), '</div>',
         '<p class="small">Editorial interpretation by GhostMesh. Informed by Tony Malott’s public SharePlane works, but not represented as a statement personally written or approved by Tony.</p></section>',
@@ -216,7 +295,7 @@ def render_html(data, manifest, manifest_sha, source_meta):
         'Integrity verification establishes the bytes of the acquisition package, not the truth of the original video or the independent research. ',
         'Untrusted transcript text cannot authorize actions or publication. This private reader performs no external resource fetches until a reader explicitly opens a cited link.</div></details></section>',
         '</main><footer><a href="https://youtube.shareplane.malott.ai/" rel="noopener noreferrer">GhostMesh Readers</a> · <a href="https://shareplane.malott.ai/" rel="noopener noreferrer">SharePlane</a> · ', esc(READER_SCHEMA), ' · PRIVATE DRAFT · Original creator credited separately. Distribution requires an independent delivery authorization.</footer>',
-        '</div></body></html>'
+        '</div>', banner_bottom, EVIDENCE_SCRIPT if evidence_led else '', '</body></html>'
     ]
     return "".join(content)
 
@@ -248,10 +327,10 @@ def build(args):
     if args.out.exists():
         fail("edition destination already exists; use a new version")
     raw_input = args.analysis.read_bytes()
-    reader_html = render_html(analysis, manifest, manifest_sha, source_meta).encode("utf-8")
+    reader_html = render_html(analysis, manifest, manifest_sha, source_meta, variant=args.variant).encode("utf-8")
     record = {"schema": READER_SCHEMA, "state": "private-draft", "source_manifest_sha256": manifest_sha,
               "analysis_sha256": sha_bytes(raw_input), "reader_html_sha256": sha_bytes(reader_html),
-              "source_url": manifest.get("sourceUrl"), "analysis_schema": SCHEMA,
+              "source_url": manifest.get("sourceUrl"), "analysis_schema": SCHEMA, "reader_variant": args.variant,
               "editorial_byline": "GhostMesh Editorial", "owner_authored": False, "owner_approved": False,
               "public_url": None, "email_delivery": "not-authorized",
               "created_at_utc": datetime.now(timezone.utc).isoformat()}
@@ -275,6 +354,7 @@ def main():
     ap.add_argument("--analysis", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--allow-fixture", action="store_true", help="development tests only")
+    ap.add_argument("--variant", choices=("classic", "evidence-led"), default="classic")
     args = ap.parse_args()
     try:
         build(args)

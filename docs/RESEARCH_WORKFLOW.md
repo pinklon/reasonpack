@@ -52,3 +52,4 @@ Long videos are not automatically exhaustive; depth is an editorial decision. A 
 - Generated claims must still be validated with the existing composer and the selected Reader/publishing contracts. A complete file set does not establish factual truth.
 - No credential access, background worker, network research, model invocation, release, or dispatch is granted here.
 - The workflow remains CLI-based. A visual guided interface and automatic model execution are not claimed as current.
+- For private Reader output, choose the unchanged default classic layout or the opt-in `--variant evidence-led` layout. See [READER_VARIANTS.md](READER_VARIANTS.md) for source/evidence relationships, search boundaries, wrapper requirements and qualification gates. The active 1.1.1 routing skill intentionally delegates execution to the versioned 1.1.0 runtime.
