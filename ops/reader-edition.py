@@ -137,7 +137,7 @@ def p(text):
 def a(url, label, css=""):
     return '<a rel="noopener noreferrer" target="_blank" class="' + css + '" href="' + esc(url) + '">' + esc(label) + '</a>'
 
-def render_html(data, manifest, manifest_sha, source_meta, companion_url=None):
+def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, continuing=()):
     if manifest.get("fixture"):
         vid = "jNQXAC9IVRw"
         video_url = "https://www.youtube.com/watch?v=" + vid
@@ -172,21 +172,56 @@ def render_html(data, manifest, manifest_sha, source_meta, companion_url=None):
         + esc(w["source_commit"][:12]) + '</small></li>'
         for w in data.get("shareplane_works", [])
     ]
-    if companion_url:
-        works.append('<li>' + a(safe_url(companion_url), "Full deconstruction and related reading") + '</li>')
+    thesis = data["thesis"]
     related = (
         '<section class="gm-related" id="related-thinking"><p class="gm-kicker">Continue the inquiry</p>'
-        '<h2>Related thinking</h2><ul>' + ''.join(works) + '</ul></section>'
-    ) if works else ''
-    thesis = data["thesis"]
+        '<h2>Related thinking</h2>'
+        + ('<ul>' + ''.join(works) + '</ul>' if works else
+           '<p>This private draft has no approved graph relationships.</p>')
+        + '</section>'
+    )
+    if len(continuing) > 12:
+        fail("too many continuing readings")
+    cards = []
+    for label, label_title, url, reason in continuing:
+        clean(label, 120)
+        clean(label_title, 220)
+        clean(reason, 600)
+        cards.append(
+            f'<article class="related-item"><small>{esc(label)}</small>'
+            f'{a(safe_url(url), label_title)}<p>{esc(reason)}</p></article>'
+        )
+    follow = ''
+    if cards or companion_url:
+        follow = (
+            '<section class="appendix" id="related"><p class="eyebrow">In context / proposed editorial connections</p>'
+            '<h2>Continue the thinking</h2>'
+            + ('<p>These reading suggestions develop adjacent arguments. They are editorial connections for this draft.</p>'
+               '<div class="related-grid">' + ''.join(cards) + '</div>' if cards else '')
+            + ('<p class="fine">' + a(safe_url(companion_url), "Full deconstruction and related SharePlane works")
+               + '</p>' if companion_url else '')
+            + '</section>'
+        )
+    brief = (
+        '<section class="gm-brief" id="at-a-glance" aria-labelledby="brief-title">'
+        '<div class="gm-brief-heading"><p class="gm-kicker">The reading / in three moves</p>'
+        '<h2 id="brief-title">Start with the distinction.</h2></div>'
+        + ''.join(
+            f'<div class="gm-brief-point"><span class="gm-brief-index">{i:02d}</span>'
+            f'<div><h3>{heading}</h3><p>{esc(value)}</p></div></div>'
+            for i, (heading, value) in enumerate((
+                ("What the video is about", data["deck"]),
+                ("Why you should care", data["executive"]),
+                ("What GhostMesh takes away", thesis["implication"]),
+            ), 1)
+        ) + '</section>'
+    )
     article = (
-        '<header class="hero"><p class="eyebrow">GhostMesh / ReasonPack / Video deconstruction</p>'
+        brief + '<header class="hero"><p class="eyebrow">GhostMesh / ReasonPack / Video deconstruction</p>'
         f'<h1>{title}</h1><p class="lead">{deck}</p><div class="meta">'
         f'<span>{creator}</span><span class="gm-private-draft">PRIVATE DRAFT</span>'
         '<span>GhostMesh editorial</span></div></header>'
         '<div class="reading"><article class="prose">'
-        '<aside class="callout" id="at-a-glance"><h2>At a glance</h2>'
-        + p(data["executive"]) + '</aside>'
         '<section id="film"><h2>Watch the original argument</h2>'
         '<div class="player gm-media-frame" data-gm-aspect="16:9">'
         f'<div id="source-video" style="position:absolute;inset:0" data-video-id="{esc(vid)}"></div>'
@@ -207,14 +242,15 @@ def render_html(data, manifest, manifest_sha, source_meta, companion_url=None):
         + '<h3>Mechanism</h3>' + p(thesis["mechanism"])
         + '<h3>Strongest counterargument</h3>' + p(thesis["counterargument"])
         + '<h3>Implication</h3>' + p(thesis["implication"]) + '</section>'
-        + related + '<section id="provenance"><details><summary>Source custody and review status</summary>'
+        + '<section id="provenance"><details><summary>Source custody and review status</summary>'
         f'<p>Verified acquisition manifest SHA-256: <code>{esc(manifest_sha)}</code>.</p>'
         '<p>Private editorial draft. Claim verdicts describe the cited evidence. Owner editorial acceptance is pending.</p>'
-        '</details></section></article><aside class="rail"><nav aria-label="In this reading">'
+        '</details></section>' + related + follow + '</article><aside class="rail"><nav aria-label="In this reading">'
         '<a href="#at-a-glance">At a glance</a><a href="#film">Source video</a>'
         '<a href="#chapters">Timestamps</a><a href="#source">Source account</a>'
         '<a href="#evidence">Claim register</a><a href="#thesis">Interpretation</a>'
-        '<a href="#provenance">Provenance</a></nav></aside></div>'
+        '<a href="#provenance">Provenance</a><a href="#related-thinking">Related thinking</a>'
+        + ('<a href="#related">Continue the thinking</a>' if follow else '') + '</nav></aside></div>'
     )
     template = Path(__file__).with_name("reader-current-shell.html").read_text("utf-8")
     slots = {"TITLE": title, "ARTICLE": article}
@@ -250,7 +286,7 @@ def build(args):
     if args.out.exists():
         fail("edition destination already exists; use a new version")
     raw_input = args.analysis.read_bytes()
-    reader_html = render_html(analysis, manifest, manifest_sha, source_meta, getattr(args, "companion_url", None)).encode("utf-8")
+    reader_html = render_html(analysis, manifest, manifest_sha, source_meta, getattr(args, "companion_url", None), getattr(args, "continue_reading", ())).encode("utf-8")
     record = {"schema": READER_SCHEMA, "state": "private-draft", "source_manifest_sha256": manifest_sha,
               "analysis_sha256": sha_bytes(raw_input), "reader_html_sha256": sha_bytes(reader_html),
               "reader_design": "ghostmesh-editorial-v1",
@@ -279,6 +315,9 @@ def main():
     ap.add_argument("--analysis", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--companion-url", help="optional HTTPS link to a companion report")
+    ap.add_argument("--continue-reading", action="append", nargs=4, default=[],
+                    metavar=("LABEL", "TITLE", "URL", "REASON"),
+                    help="proposed editorial reading connection; may be repeated")
     ap.add_argument("--allow-fixture", action="store_true", help="development tests only")
     args = ap.parse_args()
     try:
