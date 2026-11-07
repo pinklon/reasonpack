@@ -70,14 +70,14 @@ class ReaderEditionTests(unittest.TestCase):
     def test_full_deconstruction_is_rendered_inline(self):
         article = (
             '<section id="full-argument"><h2>Complete argument</h2>'
-            '<p onclick="alert(1)">Evidence &amp; limits.</p>'
+            '<p onclick="alert(1)">Evidence &amp; limits.<br />An example.</p>'
             '<table><tr><td>Verified outcome</td></tr></table></section>'
         )
         page = mod.render_html(self.data, {"fixture": True}, "a" * 64, {},
                                deconstruction=article)
         self.assertIn('href="#full-deconstruction"', page)
         self.assertIn('id="full-argument"', page)
-        self.assertIn('Evidence &amp; limits.', page)
+        self.assertIn('Evidence &amp; limits.<br>An example.', page)
         self.assertIn('Verified outcome', page)
         self.assertIn('class="rp-table-scroll"', page)
         self.assertIn('id="chapters"', page)

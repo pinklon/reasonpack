@@ -86,6 +86,11 @@ class DeconstructionFragment(HTMLParser):
         if tag not in self.void:
             self.stack.append(tag)
 
+    def handle_startendtag(self, tag, attrs):
+        if tag not in self.void:
+            fail("unsupported self-closing deconstruction element: " + tag)
+        self.handle_starttag(tag, attrs)
+
     def handle_endtag(self, tag):
         if not self.stack or self.stack.pop() != tag:
             fail("unbalanced deconstruction fragment")
