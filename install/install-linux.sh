@@ -6,6 +6,7 @@ VENV="$HOME/.local/share/reasonpack/venv"; python3 -m venv "$VENV"; "$VENV/bin/p
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/reasonpack"
 cp "$HERE/bin/reasonpack" "$HOME/.local/share/reasonpack/reasonpack"; chmod 755 "$HOME/.local/share/reasonpack/reasonpack"
 cp "$HERE/ops/media-plan.py" "$HOME/.local/share/reasonpack/media-plan.py"
+cp "$HERE/ops/reader-edition.py" "$HERE/ops/reader-current-shell.html" "$HOME/.local/share/reasonpack/"
 for n in reasonpack yt rp; do ln -sf "$HOME/.local/share/reasonpack/reasonpack" "$HOME/.local/bin/$n"; done
 ln -sf "$VENV/bin/yt-dlp" "$HOME/.local/bin/yt-dlp"
 PROFILE="$HOME/.bashrc"; [[ "${SHELL:-}" == */zsh ]] && PROFILE="$HOME/.zshrc"; touch "$PROFILE"

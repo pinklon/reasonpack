@@ -39,23 +39,28 @@ class ReaderEditionTests(unittest.TestCase):
         parser = Links()
         parser.feed(page)
         self.assertIn("chapters", parser.ids)
-        self.assertIn("theme-switch", parser.ids)
+        self.assertIn("theme-toggle", parser.ids)
+        self.assertIn("source-video", parser.ids)
+        self.assertIn("gm-search-input", parser.ids)
         self.assertIn("source", parser.ids)
         self.assertIn("evidence", parser.ids)
         self.assertIn("thesis", parser.ids)
         for i, claim in enumerate(self.data["claims"], 1):
             self.assertIn(f"claim-{i}", parser.ids)
-            self.assertIn(f"#claim-{i}", parser.hrefs)
             self.assertIn(claim["statement"], page)
         for href in parser.hrefs:
             if href.startswith("#"):
                 self.assertIn(href[1:], parser.ids)
-        self.assertEqual(parser.scripts, 0)
+        self.assertEqual(sum("&t=" in href for href in parser.hrefs), 2 * len(self.data["claims"]))
+        self.assertIn("gm-site-header", page)
+        self.assertIn("gm-site-footer", page)
+        self.assertIn("sha256-", page)
+        self.assertNotIn("<iframe ", page)
 
     def test_untrusted_label_is_escaped(self):
         self.data["claims"][0]["statement"] = "<script>alert(1)</script>"
         page = mod.render_html(self.data, {"fixture": True}, "b" * 64, {})
-        self.assertNotIn("<script>", page)
+        self.assertNotIn("<script>alert(1)</script>", page)
         self.assertIn("&lt;script&gt;", page)
         self.assertIn("PRIVATE DRAFT", page)
 
