@@ -59,6 +59,19 @@ Render a validated analysis with the default Reader layout:
 
     reasonpack reader --pack PRIVATE_PACK --analysis VALIDATED_ANALYSIS.json --out PRIVATE_READER_DIR
 
+When you have a complete editorial draft, pass it with
+`--deconstruction-html DECONSTRUCTION.html`. The Reader embeds the full argument
+and tables alongside the video, timed cues, and editorial relationships. The
+validated analysis still supplies the opening brief and video navigation.
+
+For a Markdown draft, omit its title heading (the Reader supplies it) and export
+an HTML fragment with Pandoc:
+
+    pandoc --from=gfm-raw_html --to=html5 --section-divs --id-prefix=full- BODY.md -o DECONSTRUCTION.html
+
+Use HTTPS source links in the fragment. The renderer accepts article markup,
+excludes active content, and records the fragment hash in the Reader receipt.
+
 The standalone shell is pinned to GhostMesh Readers main c3fd13c70c0c6d1cf1f8a3b85faa9014ef69c880 and the latest published video Reader at that revision, A Model That Says Yes Is Not Necessarily a Model That Knows. The template includes the shared masthead, footer, appearance controls and an offline snapshot of public Reader titles and summaries. Playback is opt-in and the original YouTube links remain available. Update this pin from the current published video Reader when refreshing the shell. Rendering creates a private HTML draft.
 
 Use repeatable `--continue-reading LABEL TITLE URL REASON` for proposed reading connections. The Reader places these under Continue the thinking and separates them from validated related Works and claim evidence.

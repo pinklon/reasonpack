@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 from hashlib import sha256
 import html
+from html.parser import HTMLParser
 import json
 import os
 import shutil
@@ -52,6 +53,67 @@ def safe_url(value, *, youtube_only=False):
         fail("external link host not permitted")
     # This renderer never fetches links; links are user-interactive only.
     return u.geturl()
+
+class DeconstructionFragment(HTMLParser):
+    tags = set("section h2 h3 h4 p a strong em code pre blockquote ul ol li "
+               "table caption thead tbody tfoot tr th td br hr".split())
+    void = {"br", "hr"}
+
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+        self.stack = []
+        self.ids = set()
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in self.tags:
+            fail("unsupported deconstruction element: " + tag)
+        attrs = dict(attrs)
+        attributes = ""
+        if tag == "a":
+            attributes = f' href="{esc(safe_url(attrs.get("href")))}" rel="noopener noreferrer"'
+        elif tag in {"section", "h2", "h3", "h4"} and "id" in attrs:
+            anchor = attrs["id"] or ""
+            if (not re.fullmatch(r"full-[a-z0-9][a-z0-9_-]{0,127}", anchor)
+                    or anchor in self.ids or anchor == "full-deconstruction"):
+                fail("invalid or repeated deconstruction anchor")
+            self.ids.add(anchor)
+            attributes = f' id="{anchor}"'
+        elif tag == "table":
+            self.parts.append('<div class="rp-table-scroll" role="region" aria-label="Table" tabindex="0">')
+            attributes = ' class="comparison"'
+        self.parts.append(f"<{tag}{attributes}>")
+        if tag not in self.void:
+            self.stack.append(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        if tag not in self.void:
+            fail("unsupported self-closing deconstruction element: " + tag)
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if not self.stack or self.stack.pop() != tag:
+            fail("unbalanced deconstruction fragment")
+        self.parts.append(f"</{tag}>")
+        if tag == "table":
+            self.parts.append("</div>")
+
+    def handle_data(self, data):
+        self.parts.append(esc(data))
+
+    def handle_decl(self, declaration):
+        fail("expected a deconstruction HTML fragment")
+
+
+def render_deconstruction(source):
+    parser = DeconstructionFragment()
+    parser.feed(clean(source, 512 * 1024))
+    parser.close()
+    if parser.stack:
+        fail("unbalanced deconstruction fragment")
+    return ('<section class="full-deconstruction" id="full-deconstruction">'
+            '<h2>Full deconstruction</h2>' + ''.join(parser.parts) + '</section>')
+
 
 def time_seconds(v):
     if not isinstance(v, str) or not TIME_RE.fullmatch(v):
@@ -137,7 +199,8 @@ def p(text):
 def a(url, label, css=""):
     return '<a rel="noopener noreferrer" target="_blank" class="' + css + '" href="' + esc(url) + '">' + esc(label) + '</a>'
 
-def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, continuing=()):
+def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, continuing=(),
+                deconstruction=None):
     if manifest.get("fixture"):
         vid = "jNQXAC9IVRw"
         video_url = "https://www.youtube.com/watch?v=" + vid
@@ -191,6 +254,8 @@ def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, c
             f'<article class="related-item"><small>{esc(label)}</small>'
             f'{a(safe_url(url), label_title)}<p>{esc(reason)}</p></article>'
         )
+    if deconstruction is not None:
+        companion_url = None
     follow = ''
     if cards or companion_url:
         follow = (
@@ -216,6 +281,30 @@ def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, c
             ), 1)
         ) + '</section>'
     )
+    if deconstruction is not None:
+        body = render_deconstruction(deconstruction)
+        body_nav = '<a href="#full-deconstruction">Full deconstruction</a>'
+    else:
+        body = (
+            '<section id="source"><h2>What the video claims</h2>' + p(data["source_account"]) + '</section>'
+            '<section class="gm-evidence" id="evidence"><div class="gm-evidence-intro">'
+            '<p class="gm-kicker">Claim register</p><h2>Corroboration and counterevidence</h2>'
+            + p(data["evidence_summary"]) + '</div><div class="gm-evidence-body"><div class="gm-claim-list">'
+            + ''.join(claims) + '</div></div></section>'
+            f'<section id="thesis"><h2>{esc(thesis["title"])}</h2>' + p(thesis["argument"])
+            + '<h3>Mechanism</h3>' + p(thesis["mechanism"])
+            + '<h3>Strongest counterargument</h3>' + p(thesis["counterargument"])
+            + '<h3>Implication</h3>' + p(thesis["implication"]) + '</section>'
+            + '<section id="provenance"><details><summary>Source custody and review status</summary>'
+            f'<p>Verified acquisition manifest SHA-256: <code>{esc(manifest_sha)}</code>.</p>'
+            '<p>Private editorial draft. Claim verdicts describe the cited evidence. Owner editorial acceptance is pending.</p>'
+            '</details></section>'
+        )
+        body_nav = (
+            '<a href="#source">Source account</a>'
+            '<a href="#evidence">Claim register</a><a href="#thesis">Interpretation</a>'
+            '<a href="#provenance">Provenance</a>'
+        )
     article = (
         brief + '<header class="hero"><p class="eyebrow">GhostMesh / ReasonPack / Video deconstruction</p>'
         f'<h1>{title}</h1><p class="lead">{deck}</p><div class="meta">'
@@ -233,26 +322,20 @@ def render_html(data, manifest, manifest_sha, source_meta, companion_url=None, c
         '<h3>Jump to a part of the conversation</h3>'
         '<p class="caption">Choose a passage to start the player at its timestamp.</p>'
         '<div class="chapter-grid">' + ''.join(chapters) + '</div></nav></section>'
-        '<section id="source"><h2>What the video claims</h2>' + p(data["source_account"]) + '</section>'
-        '<section class="gm-evidence" id="evidence"><div class="gm-evidence-intro">'
-        '<p class="gm-kicker">Claim register</p><h2>Corroboration and counterevidence</h2>'
-        + p(data["evidence_summary"]) + '</div><div class="gm-evidence-body"><div class="gm-claim-list">'
-        + ''.join(claims) + '</div></div></section>'
-        f'<section id="thesis"><h2>{esc(thesis["title"])}</h2>' + p(thesis["argument"])
-        + '<h3>Mechanism</h3>' + p(thesis["mechanism"])
-        + '<h3>Strongest counterargument</h3>' + p(thesis["counterargument"])
-        + '<h3>Implication</h3>' + p(thesis["implication"]) + '</section>'
-        + '<section id="provenance"><details><summary>Source custody and review status</summary>'
-        f'<p>Verified acquisition manifest SHA-256: <code>{esc(manifest_sha)}</code>.</p>'
-        '<p>Private editorial draft. Claim verdicts describe the cited evidence. Owner editorial acceptance is pending.</p>'
-        '</details></section>' + related + follow + '</article><aside class="rail"><nav aria-label="In this reading">'
+        + body + related + follow + '</article><aside class="rail"><nav aria-label="In this reading">'
         '<a href="#at-a-glance">At a glance</a><a href="#film">Source video</a>'
-        '<a href="#chapters">Timestamps</a><a href="#source">Source account</a>'
-        '<a href="#evidence">Claim register</a><a href="#thesis">Interpretation</a>'
-        '<a href="#provenance">Provenance</a><a href="#related-thinking">Related thinking</a>'
+        '<a href="#chapters">Timestamps</a>' + body_nav
+        + '<a href="#related-thinking">Related thinking</a>'
         + ('<a href="#related">Continue the thinking</a>' if follow else '') + '</nav></aside></div>'
     )
     template = Path(__file__).with_name("reader-current-shell.html").read_text("utf-8")
+    if deconstruction is not None:
+        css = (
+            ".full-deconstruction{overflow-wrap:anywhere}"
+            ".full-deconstruction section{margin:2.5rem 0;scroll-margin-top:100px}"
+            ".rp-table-scroll{overflow:auto;max-width:100%;margin:1.5rem 0}"
+        )
+        template = template.replace("</style>", css + "</style>", 1)
     slots = {"TITLE": title, "ARTICLE": article}
     return re.sub(r"@@(TITLE|ARTICLE)@@", lambda match: slots[match[1]], template)
 
@@ -286,7 +369,13 @@ def build(args):
     if args.out.exists():
         fail("edition destination already exists; use a new version")
     raw_input = args.analysis.read_bytes()
-    reader_html = render_html(analysis, manifest, manifest_sha, source_meta, getattr(args, "companion_url", None), getattr(args, "continue_reading", ())).encode("utf-8")
+    full_path = getattr(args, "deconstruction_html", None)
+    full_input = full_path.read_bytes() if full_path is not None else None
+    reader_html = render_html(
+        analysis, manifest, manifest_sha, source_meta, getattr(args, "companion_url", None),
+        getattr(args, "continue_reading", ()),
+        deconstruction=full_input.decode("utf-8") if full_input is not None else None,
+    ).encode("utf-8")
     record = {"schema": READER_SCHEMA, "state": "private-draft", "source_manifest_sha256": manifest_sha,
               "analysis_sha256": sha_bytes(raw_input), "reader_html_sha256": sha_bytes(reader_html),
               "reader_design": "ghostmesh-editorial-v1",
@@ -295,6 +384,8 @@ def build(args):
               "editorial_byline": "GhostMesh Editorial", "owner_authored": False, "owner_approved": False,
               "public_url": None, "email_delivery": "not-authorized",
               "created_at_utc": datetime.now(timezone.utc).isoformat()}
+    if full_input is not None:
+        record["deconstruction_sha256"] = sha_bytes(full_input)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".reader-stage-", dir=args.out.parent))
     try:
@@ -314,7 +405,10 @@ def main():
     ap.add_argument("--pack", type=Path, required=True)
     ap.add_argument("--analysis", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--companion-url", help="optional HTTPS link to a companion report")
+    editorial = ap.add_mutually_exclusive_group()
+    editorial.add_argument("--companion-url", help="optional HTTPS link to a companion report")
+    editorial.add_argument("--deconstruction-html", type=Path,
+                           help="complete editorial HTML fragment to render inline")
     ap.add_argument("--continue-reading", action="append", nargs=4, default=[],
                     metavar=("LABEL", "TITLE", "URL", "REASON"),
                     help="proposed editorial reading connection; may be repeated")
