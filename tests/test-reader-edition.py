@@ -57,6 +57,16 @@ class ReaderEditionTests(unittest.TestCase):
         self.assertIn("sha256-", page)
         self.assertNotIn("<iframe ", page)
 
+    def test_editorial_connections_stay_separate_from_claim_evidence(self):
+        page = mod.render_html(self.data, {"fixture": True}, "a" * 64, {},
+                               continuing=[("Parallel work", "Adjacent Reader",
+                                            "https://youtube.shareplane.malott.ai/example/",
+                                            "<em>Reason</em>")])
+        self.assertLess(page.index('id="at-a-glance"'), page.index('<h1>'))
+        self.assertLess(page.index('id="related-thinking"'), page.index('id="related"'))
+        self.assertNotIn("Adjacent Reader", page.split('id="related"')[0])
+        self.assertIn("&lt;em&gt;Reason&lt;/em&gt;", page)
+
     def test_untrusted_label_is_escaped(self):
         self.data["claims"][0]["statement"] = "<script>alert(1)</script>"
         page = mod.render_html(self.data, {"fixture": True}, "b" * 64, {})
