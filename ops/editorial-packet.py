@@ -86,13 +86,24 @@ def main():
             # exact input whose digest is recorded above.
             inline_transcript=transcript_path.read_bytes().decode("utf-8")
             segment_ref={"transcript_mode":"inline","segment_count":1}
+        transcript_provenance=json.loads((args.pack/"transcript-status.json").read_text())
         caption_ref={}
         caption_path=args.pack/"captions.vtt"
+        timing_origin="source-captions"
+        if not caption_path.exists() and transcript_provenance.get("status")=="local-whisper-fallback":
+            if transcript_provenance.get("timedTranscriptFile")=="transcript.vtt":
+                caption_path=args.pack/"transcript.vtt"
+                if not caption_path.is_file():
+                    fail("declared local timed transcript is missing")
+                timing_origin="local-whisper-fallback"
         if caption_path.exists():
             spec=importlib.util.spec_from_file_location("reasonpack_caption_timeline",repo/"ops/caption-timeline.py")
             capmod=importlib.util.module_from_spec(spec)
             spec.loader.exec_module(capmod)
-            caption_ref={"source_caption_timeline":capmod.from_vtt(caption_path)}
+            timeline=capmod.from_vtt(caption_path)
+            if timing_origin=="local-whisper-fallback":
+                timeline["timing_origin"]=timing_origin
+            caption_ref={"source_caption_timeline":timeline}
         approved_dir=(repo/"editorial/approved-works").resolve()
         approved_paths=sorted(approved_dir.glob("*.json"))
         chosen=args.work if args.work else approved_paths
@@ -125,8 +136,7 @@ def main():
                           "excerpt":doc.get("excerpt","")[:16000]})
         packet={"schema":SCHEMA,"status":"awaiting-independent-research",
                 "source_url":manifest.get("sourceUrl"),"source_manifest_sha256":digest(manifest_raw),
-                "transcript_sha256":transcript_hash,"transcript_provenance":
-                      json.loads((args.pack/"transcript-status.json").read_text()),
+                "transcript_sha256":transcript_hash,"transcript_provenance":transcript_provenance,
                 "untrusted_transcript":inline_transcript,
                 **segment_ref,
                 **caption_ref,

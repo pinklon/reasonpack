@@ -120,7 +120,7 @@ def prompt(packet,registry,identity,depth):
         "Every supported, partially-supported or disputed claim must cite at least one registered source.",
         "A citation is not automatically factual proof. Distinguish primary evidence, indirect support, dispute, and unknown.",
         "If evidence is inadequate, mark the claim unknown, unsupported or disputed as justified. Do not invent certainty.",
-        "Use HH:MM:SS video timestamps for video-spoken claims. When a verified source_caption_timeline is present, anchor navigation to its timed cue text, not invented timecodes. Sampled cues are approximate seeking aids, not word-level attestation.",
+        "Use HH:MM:SS video timestamps for video-spoken claims. When a verified source_caption_timeline is present, anchor navigation to its timed cue text, not invented timecodes. A timing_origin of local-whisper-fallback means the cues are inferred from audio. All cues are approximate seeking aids, not word-level attestation.",
         "Keep creator-repository-only observations in evidence_summary or thesis, not as falsely video-timestamped claims. If a video claim lacks a defensible caption cue, omit it from the timestamped claims list rather than fabricating a time.",
         "Include what the video says, what independent sources establish, and an original GhostMesh thesis with a strong counterargument.",
         "Only use works from the supplied SharePlane public-context catalog, matching pinned title, URL and commit.",

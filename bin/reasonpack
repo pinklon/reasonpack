@@ -69,11 +69,21 @@ PY
   [[ -x "$WHISPER_CLI" && -f "$WHISPER_MODEL" ]] || return 21
   local wav="${out%.txt}.wav" base="${out%.txt}"
   ffmpeg -hide_banner -loglevel error -y -i "$audio" -ar 16000 -ac 1 -c:a pcm_s16le "$wav"
-  "$WHISPER_CLI" -m "$WHISPER_MODEL" -f "$wav" -otxt -of "$base" -np >/dev/null 2>"$base.whisper.stderr" || true
+  rm -f "$base.vtt"
+  if ! "$WHISPER_CLI" -m "$WHISPER_MODEL" -f "$wav" -otxt -ovtt -of "$base" -np >/dev/null 2>"$base.whisper.stderr"; then
+    rm -f "$base.vtt"
+  fi
+  [[ -s "$base.vtt" ]] || rm -f "$base.vtt"
   [[ -s "$out" ]] || return 23
-  python3 - "$status" "$WHISPER_CLI" "$WHISPER_MODEL" "$(sha_file "$WHISPER_MODEL")" <<'PY'
+  python3 - "$status" "$WHISPER_CLI" "$WHISPER_MODEL" "$(sha_file "$WHISPER_MODEL")" "$base.vtt" <<'PY'
 import json,sys
-p,cli,model,h=sys.argv[1:]; open(p,'w').write(json.dumps({'status':'local-whisper-fallback','whisperCli':cli,'whisperModel':model,'whisperModelSha256':h},indent=2)+'\n')
+from pathlib import Path
+p,cli,model,h,vtt=sys.argv[1:]
+status={'status':'local-whisper-fallback','whisperCli':cli,'whisperModel':model,'whisperModelSha256':h}
+timing=Path(vtt)
+if timing.is_file():
+ status['timedTranscriptFile']=timing.name
+Path(p).write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8')
 PY
 }
 build(){
@@ -137,7 +147,7 @@ def ver(cmd):
   p=subprocess.run([cmd,'--version'],capture_output=True,text=True,timeout=10); t=(p.stdout or p.stderr).splitlines(); return t[0] if t else None
  except Exception:return None
 m={'schema':'ghostmesh-reasoning-pack-v1','sourceUrl':url,'tools':{x:ver(x) for x in ['yt-dlp','ffmpeg','ffprobe','python3']},'members':[]}
-for name in ['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json','captions.vtt']:
+for name in ['video.mp4','audio.m4a','transcript.txt','transcript-status.json','source.json','ffprobe.json','captions.vtt','transcript.vtt']:
  p=os.path.join(out,name)
  if os.path.isfile(p): m['members'].append({'path':name,'sha256':hashlib.sha256(open(p,'rb').read()).hexdigest(),'bytes':os.path.getsize(p)})
 open(os.path.join(out,'manifest.json'),'w').write(json.dumps(m,indent=2)+'\n')

@@ -19,6 +19,7 @@ It is deliberately narrower than a general archival standard. The goal is a smal
 | `manifest.json` | member inventory and source/tool context | Yes | schema `ghostmesh-reasoning-pack-v1` |
 | `SHA256SUMS.txt` | independent checksum list | Yes | includes manifest and tracked members |
 | `captions.vtt` | original selected source caption file | Conditional | included when source captions are used |
+| `transcript.vtt` | locally inferred timing from the same Whisper pass as the text | Optional | tracked with size and SHA-256 when emitted |
 
 ## `manifest.json`
 
@@ -94,7 +95,7 @@ Record includes:
 - model path;
 - model SHA-256.
 
-Meaning: transcript text was inferred locally by the configured model.
+Meaning: transcript text was inferred locally by the configured model. When Whisper emits timed output, `timedTranscriptFile: transcript.vtt` binds that member to the fallback provenance. Editorial preparation labels these cues as locally inferred. Older text-only packs remain valid.
 
 ### No transcript capability
 
