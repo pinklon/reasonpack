@@ -67,6 +67,27 @@ class ReaderEditionTests(unittest.TestCase):
         self.assertNotIn("Adjacent Reader", page.split('id="related"')[0])
         self.assertIn("&lt;em&gt;Reason&lt;/em&gt;", page)
 
+    def test_full_deconstruction_is_rendered_inline(self):
+        article = (
+            '<section id="full-argument"><h2>Complete argument</h2>'
+            '<p onclick="alert(1)">Evidence &amp; limits.</p>'
+            '<table><tr><td>Verified outcome</td></tr></table></section>'
+        )
+        page = mod.render_html(self.data, {"fixture": True}, "a" * 64, {},
+                               deconstruction=article)
+        self.assertIn('href="#full-deconstruction"', page)
+        self.assertIn('id="full-argument"', page)
+        self.assertIn('Evidence &amp; limits.', page)
+        self.assertIn('Verified outcome', page)
+        self.assertIn('class="rp-table-scroll"', page)
+        self.assertIn('id="chapters"', page)
+        self.assertNotIn('id="evidence"', page)
+        self.assertNotIn('onclick="alert(1)"', page)
+        for unsafe in ('<script>bad</script>', '<a href="javascript:bad">bad</a>',
+                       '<section id="related-thinking"></section>', '<p>unfinished'):
+            with self.subTest(unsafe=unsafe), self.assertRaises(ValueError):
+                mod.render_deconstruction(unsafe)
+
     def test_untrusted_label_is_escaped(self):
         self.data["claims"][0]["statement"] = "<script>alert(1)</script>"
         page = mod.render_html(self.data, {"fixture": True}, "b" * 64, {})
