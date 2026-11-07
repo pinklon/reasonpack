@@ -6,6 +6,7 @@ for pkg in yt-dlp ffmpeg python; do brew list --versions "$pkg" >/dev/null 2>&1 
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/reasonpack"
 cp "$HERE/bin/reasonpack" "$HOME/.local/share/reasonpack/reasonpack"; chmod 755 "$HOME/.local/share/reasonpack/reasonpack"
 cp "$HERE/ops/media-plan.py" "$HOME/.local/share/reasonpack/media-plan.py"
+cp "$HERE/ops/reader-edition.py" "$HERE/ops/reader-current-shell.html" "$HOME/.local/share/reasonpack/"
 for n in reasonpack yt rp; do ln -sf "$HOME/.local/share/reasonpack/reasonpack" "$HOME/.local/bin/$n"; done
 PROFILE="$HOME/.zshrc"; touch "$PROFILE"
 grep -q "REASONPACK REF KIT" "$PROFILE" || printf '

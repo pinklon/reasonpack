@@ -203,6 +203,7 @@ Usage:
   reasonpack build URL OUT_DIR
   reasonpack resume URL OUT_DIR
   reasonpack verify OUT_DIR
+  reasonpack reader --pack PACK --analysis ANALYSIS --out OUT_DIR
   reasonpack self-test
   reasonpack URL [OUTPUT_ROOT]
 Optional local Whisper fallback:
@@ -212,4 +213,4 @@ EOF
 }
 cmd="${1:-}"; [[ -n "$cmd" ]] || { usage; exit 64; }; shift || true
 case "$cmd" in
- doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; resume) [[ $# -eq 2 ]] || exit 64; REASONPACK_RESUME=1 build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
+ doctor) doctor "$@";; inspect) [[ $# -eq 1 ]] || exit 64; inspect "$@";; build) [[ $# -eq 2 ]] || exit 64; build "$@";; resume) [[ $# -eq 2 ]] || exit 64; REASONPACK_RESUME=1 build "$@";; verify) [[ $# -eq 1 ]] || exit 64; verify "$@";; reader) reader_script="$SCRIPT_DIR/../ops/reader-edition.py"; [[ -f "$reader_script" ]] || reader_script="$SCRIPT_DIR/reader-edition.py"; exec python3 "$reader_script" "$@";; self-test) self_test;; -h|--help|help) usage;; -V|--version) echo "$VERSION";; http://*|https://*) quick "$cmd" "${1:-$DEFAULT_ROOT}";; *) usage >&2; exit 64;; esac
